@@ -1,0 +1,1 @@
+# Paquete "routers": aquí viven los archivos de rutas (productos, pedidos, etc.)

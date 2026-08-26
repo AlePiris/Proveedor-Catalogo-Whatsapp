@@ -1,0 +1,8 @@
+# Lo que el build de Docker NO copia a la imagen del frontend.
+# node_modules se instala dentro del contenedor (ver Dockerfile); copiarlo
+# desde el host sería lento y conflictivo (binarios compilados para otra plataforma).
+node_modules
+dist
+.vite
+.git
+*.log

@@ -1,0 +1,40 @@
+# ===== Secretos: NUNCA se commitean =====
+# .env contiene contraseñas, JWT_SECRET y la URL de la DB con credenciales.
+# Cada persona lo genera copiando de .env.example. Si lo subieras a Git,
+# cualquiera con acceso al repo vería tus secretos (y GitHub los escanea).
+.env
+.env.local
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# ===== Python (backend) =====
+# venv/ son dependencias instaladas: se regeneran con `pip install -r requirements.txt`.
+# Subirlas llenaría el repo de miles de archivos. __pycache__ son compilados
+# intermedios de Python que se recrean solos.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+*.db
+
+# ===== Node (frontend) =====
+# node_modules/ son dependencias: se regeneran con `npm install`. Pesan decenas
+# de MB y no tienen sentido versionados. dist/ es el build de producción.
+node_modules/
+dist/
+.vite/
+
+# ===== Editores / SO =====
+# Archivos locales del editor o del sistema que no aportan al proyecto.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# ===== Imágenes subidas (runtime) =====
+# Las imágenes que sube el dueño se guardan acá en dev. En prod van a Vercel Blob.
+# El backend crea la carpeta solo; no se versionan los archivos que suba el usuario.
+backend/uploads/

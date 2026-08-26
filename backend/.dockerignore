@@ -1,0 +1,9 @@
+# Lo que el build de Docker NO copia a la imagen del backend.
+__pycache__
+*.pyc
+.venv
+venv
+env
+.env
+.pytest_cache
+.git

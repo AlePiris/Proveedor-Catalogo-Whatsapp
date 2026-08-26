@@ -1,0 +1,61 @@
+# Orquesta los 3 servicios para desarrollo local.
+# Uso:  docker-compose up --build
+#
+# Servicios:
+#   db       -> PostgreSQL 16
+#   backend  -> FastAPI (crea tablas + seed + arranca uvicorn)
+#   frontend -> Vite dev server (HMR)
+#
+# En producción NO se usa esto: deploy va a Vercel + Neon.
+# Aquí solo para desarrollar.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pizzeria
+      POSTGRES_PASSWORD: pizzeria
+      POSTGRES_DB: pizzeria
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Healthcheck: el backend espera a que esto esté "healthy" antes de arrancar,
+    # así init_db no falla si Postgres todavía está levantándose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pizzeria -d pizzeria"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      # Apunta a la DB por el NOMBRE del servicio "db" (resolución interna de Docker).
+      DATABASE_URL: postgresql+psycopg2://pizzeria:pizzeria@db:5432/pizzeria
+      JWT_SECRET: cambia-esto-en-produccion-usa-algo-largo-y-aleatorio
+      CORS_ORIGINS: http://localhost:5173,http://localhost:4173
+    ports:
+      # host:contenedor. El backend escucha en 8800 del host (el 8000/8080/18000
+      # están ocupados por tus otros proyectos). Dentro del contenedor sigue en 8000.
+      - "8800:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      # El proxy de Vite apunta /api al backend (por nombre de servicio en la red Docker).
+      VITE_PROXY_TARGET: http://backend:8000
+      # En desarrollo NO definimos VITE_API_URL: así el frontend usa '/api'
+      # (relativo) y el proxy de Vite lo redirige al backend. En prod (Vercel)
+      # sí se define VITE_API_URL con la URL completa del backend.
+      VITE_WA_NUMBER: "5491100000000"  # número de WhatsApp de la pizzería (formato internacional sin +)
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

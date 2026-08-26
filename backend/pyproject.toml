@@ -1,0 +1,7 @@
+# Configuración para el runtime de Python en Vercel.
+# Las dependencias reales viven en requirements.txt (más simple para el proyecto).
+# Aquí solo declaramos el entrypoint de FastAPI para Vercel:
+#   "app.main:app"  =>  módulo app/main.py, variable `app` (la instancia de FastAPI).
+# Así Vercel sabe qué servir como función serverless sin depender de autodetección.
+[tool.vercel]
+entrypoint = "app.main:app"
