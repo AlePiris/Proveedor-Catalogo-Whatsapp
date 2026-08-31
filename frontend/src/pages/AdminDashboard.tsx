@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { clearToken, getToken } from "@/api/client";
 import GestionProductos from "@/pages/admin/GestionProductos";
 import GestionPedidos from "@/pages/admin/GestionPedidos";
+import Combos from "@/pages/admin/Combos";
 import Analisis from "@/pages/admin/Analisis";
+import Ajustes from "@/pages/admin/Ajustes";
 
-type Tab = "productos" | "pedidos" | "analisis";
+type Tab = "productos" | "combos" | "pedidos" | "analisis" | "ajustes";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -41,15 +43,23 @@ export default function AdminDashboard() {
           <TabButton active={tab === "productos"} onClick={() => setTab("productos")}>
             Productos
           </TabButton>
+          <TabButton active={tab === "combos"} onClick={() => setTab("combos")}>
+            Combos
+          </TabButton>
           <TabButton active={tab === "analisis"} onClick={() => setTab("analisis")}>
             Análisis
+          </TabButton>
+          <TabButton active={tab === "ajustes"} onClick={() => setTab("ajustes")}>
+            Ajustes
           </TabButton>
         </div>
 
         {/* Render condicional del tab activo */}
         {tab === "pedidos" && <GestionPedidos />}
         {tab === "productos" && <GestionProductos />}
+        {tab === "combos" && <Combos />}
         {tab === "analisis" && <Analisis />}
+        {tab === "ajustes" && <Ajustes />}
       </div>
     </div>
   );

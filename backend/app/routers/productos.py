@@ -13,6 +13,12 @@ Endpoints de ADMIN (requieren token):
   POST   /api/productos/{id}/imagen  subir imagen (archivo)
   DELETE /api/productos/{id}       borrar
 
+Combos (categoria="combo"): precio propio + componentes en combo_items.
+  POST   /api/combos               crear combo
+  PUT    /api/combos/{id}          editar combo (items = reemplazo completo)
+  PATCH  /api/combos/{id}/activo   activar/desactivar el combo
+  DELETE /api/combos/{id}          borrar combo (y sus items, por cascade)
+
 El orden "ofertas primero" se logra ordenando por (en_oferta DESC, orden ASC):
 las ofertas (True=1) quedan arriba, y dentro de cada grupo, por el campo orden.
 
@@ -29,11 +35,20 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.database import get_db
-from app.models import Producto
-from app.schemas import ProductoCreate, ProductoOut, ProductoUpdate, OfertaUpdate
+from app.models import Producto, ComboItem
+from app.schemas import (
+    ProductoCreate,
+    ProductoOut,
+    ProductoUpdate,
+    OfertaUpdate,
+    ComboCreate,
+    ComboUpdate,
+    ComboActivoUpdate,
+)
 from app.config import settings
 
 router = APIRouter(prefix="/api/productos", tags=["productos"])
+combos_router = APIRouter(prefix="/api/combos", tags=["combos"])
 
 # Carpeta donde se guardan las imágenes subidas. En dev local se sirve desde
 # acá (ver StaticFiles en main.py). En Vercel (serverless) esto NO persiste:
@@ -54,11 +69,16 @@ def listar_productos(db: Session = Depends(get_db)):
     """
     Lista los productos VISIBLES para el cliente: los que tienen stock > 0,
     más los que el dueño marcó como mostrar_sin_stock (aunque estén en 0).
-    Ordenados: ofertas primero, luego por 'orden'.
+    Además, TODO lo mostrado debe estar activo (los combos apagados no salen).
+    Ordenados: ofertas primero, luego por 'orden' (la sección de combos la
+    arma el frontend filtrando categoria='combo').
     """
     return (
         db.query(Producto)
-        .filter(or_(Producto.stock > 0, Producto.mostrar_sin_stock.is_(True)))
+        .filter(
+            or_(Producto.stock > 0, Producto.mostrar_sin_stock.is_(True)),
+            Producto.activo.is_(True),
+        )
         .order_by(Producto.en_oferta.desc(), Producto.orden.asc())
         .all()
     )
@@ -145,10 +165,17 @@ def borrar_producto(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
-    """Borra un producto. Los pedidos históricos sobreviven (snapshot + FK null)."""
+    """
+    Borra un producto. Los pedidos históricos sobreviven (snapshot + FK null).
+    Si era componente de algún combo, se quita de esos combos (cascade manual:
+    un combo con un componente borrado describiría algo ya inexistente).
+    """
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    # Quita este producto de los combos que lo incluían. (El snapshot del
+    # PedidoItem NO se toca: los pedidos históricos quedan intactos.)
+    db.query(ComboItem).filter(ComboItem.producto_id == producto_id).delete()
     db.delete(producto)
     db.commit()
     return None
@@ -194,3 +221,126 @@ async def subir_imagen(
     db.commit()
     db.refresh(producto)
     return producto
+
+
+### ---------- Combos (admin): categoria fija "combo" + componentes ----------
+
+# Helpers de combos
+def _obtener_combo(db: Session, combo_id: int) -> Producto:
+    combo = db.query(Producto).filter(Producto.id == combo_id, Producto.categoria == "combo").first()
+    if combo is None:
+        raise HTTPException(status_code=404, detail="Combo no encontrado")
+    return combo
+
+
+def _construir_combo_items(items_in, combo_id: int | None, db: Session) -> list[ComboItem]:
+    """
+    Convierte los componentes que manda el dueño en ComboItem ORM. Valida que
+    cada producto exista y que el combo no se incluya a sí mismo.
+    """
+    filas: list[ComboItem] = []
+    vistos: set[int] = set()
+    for it in items_in:
+        if it.producto_id in vistos:
+            raise HTTPException(status_code=400, detail="El combo no puede repetir el mismo producto (suma las cantidades)")
+        if it.producto_id == combo_id:
+            raise HTTPException(status_code=400, detail="El combo no puede incluirse a sí mismo")
+        producto = db.query(Producto).filter(
+            Producto.id == it.producto_id, Producto.categoria != "combo"
+        ).first()
+        if producto is None:
+            raise HTTPException(status_code=400, detail=f"Producto {it.producto_id} no existe (o es otro combo)")
+        filas.append(ComboItem(combo_id=combo_id, producto_id=producto.id, cantidad=it.cantidad))
+        vistos.add(producto.id)
+    if not filas:
+        raise HTTPException(status_code=400, detail="Un combo necesita al menos un componente")
+    return filas
+
+
+@combos_router.post("", status_code=201, response_model=ProductoOut)
+def crear_combo(
+    datos: ComboCreate,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Crea un combo: una fila en productos (categoria='combo') + componentes."""
+    if datos.precio <= 0:
+        raise HTTPException(status_code=400, detail="El precio del combo debe ser mayor a 0")
+    componentes = _construir_combo_items(datos.items, None, db)
+    combo = Producto(
+        nombre=datos.nombre,
+        descripcion=datos.descripcion,
+        precio=datos.precio,
+        stock=datos.stock,
+        categoria="combo",          # fija: así el frontend lo separa en su sección
+        etiqueta=datos.etiqueta,
+        imagen_url=datos.imagen_url,
+        disponible=datos.stock > 0,
+    )
+    combo.combo_items = componentes
+    db.add(combo)
+    db.commit()
+    db.refresh(combo)
+    return combo
+
+
+@combos_router.put("/{combo_id}", response_model=ProductoOut)
+def editar_combo(
+    combo_id: int,
+    datos: ComboUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """
+    Edita el combo. Si vienen `items`, se reemplazan TODOS los componentes
+    (mismo patrón que PedidoUpdate): simple y predecible.
+    """
+    combo = _obtener_combo(db, combo_id)
+    cambios = datos.model_dump(exclude_unset=True)
+    # Sacamos "items" ANTES de dump: model_dump convierte los ComboItemIn en
+    # dicts y perdemos el atributo .producto_id. Usamos el campo del schema
+    # (objetos pydantic), que es lo que _construir_combo_items espera.
+    hay_items = "items" in cambios
+    cambios.pop("items", None)
+    for campo, valor in cambios.items():
+        setattr(combo, campo, valor)
+
+    if hay_items:
+        if len(datos.items) == 0:
+            raise HTTPException(status_code=400, detail="Un combo necesita al menos un componente")
+        combo.combo_items = _construir_combo_items(datos.items, combo_id, db)
+
+    db.commit()
+    db.refresh(combo)
+    return combo
+
+
+@combos_router.patch("/{combo_id}/activo", response_model=ProductoOut)
+def cambiar_activo(
+    combo_id: int,
+    datos: ComboActivoUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """
+    Enciende/apaga el combo manualmente (la promo del festivo se saca el
+    día siguiente sin borrarlo ni perder su receta).
+    """
+    combo = _obtener_combo(db, combo_id)
+    combo.activo = datos.activo
+    db.commit()
+    db.refresh(combo)
+    return combo
+
+
+@combos_router.delete("/{combo_id}", status_code=204)
+def borrar_combo(
+    combo_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Borra el combo (sus combo_items van por cascade). Pedidos históricos intactos."""
+    combo = _obtener_combo(db, combo_id)
+    db.delete(combo)  # cascade delete-orphan borra sus combo_items
+    db.commit()
+    return None

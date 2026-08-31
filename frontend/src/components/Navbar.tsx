@@ -9,10 +9,13 @@ export default function Navbar() {
     <nav className="bg-marca text-white shadow-md">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-          🍕 Pizzería Don José
+          🍕 Pizzería El Gordito
         </Link>
 
         <div className="flex items-center gap-4">
+          <Link to="/contacto" className="text-sm hover:underline opacity-90">
+            Contacto
+          </Link>
           <Link to="/admin" className="text-sm hover:underline opacity-90">
             Dueño
           </Link>

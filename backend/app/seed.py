@@ -9,8 +9,23 @@ El admin arranca con admin / admin123 (solo para desarrollo; en producción
 definir un password fuerte o cargarlo por variable de entorno).
 """
 from app.database import SessionLocal
-from app.models import Producto, AdminUser
+from app.models import Producto, AdminUser, LocalConfig
 from app.auth import hash_password
+
+# Fila única de config del local: se crea SOLO si no existe, con campos vacíos
+# para que el dueño los complete desde Ajustes. Nota: el GET público tampoco
+# necesita esta fila (devuelve defaults si falta), esto es para que Ajustes
+# arranca con una fila ya persistida.
+LOCAL_DEFAULT = dict(
+    id=1,
+    nombre="Pizzería El Gordito",
+    direccion="Av. Siempre Viva 742",
+    telefono="11 5555-5555",
+    whatsapp="",
+    radio_delivery_km=3,
+    horarios="Lun a Dom, 19:00 a 23:00",
+    descripcion="Pizzas caseras a horno de leña.",
+)
 
 
 CATALOGO = [
@@ -54,6 +69,13 @@ def main():
             print(f"Cargados {len(CATALOGO)} productos.")
         else:
             print("Ya hay productos (no se duplican).")
+
+        # Config del local: solo si no existe la fila única (id=1).
+        if db.query(LocalConfig).filter(LocalConfig.id == 1).first() is None:
+            db.add(LocalConfig(**LOCAL_DEFAULT))
+            print("Config del local creada (editala desde Ajustes).")
+        else:
+            print("La config del local ya existe (no se recrea).")
 
         db.commit()
         print("Seed listo.")

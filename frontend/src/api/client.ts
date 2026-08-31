@@ -47,7 +47,13 @@ async function request<T>(path: string, opts: RequestInit = {}, auth = false): P
 }
 
 // ===================== Endpoints públicos =====================
-import type { Producto, PedidoCreate, PedidoOut, Token } from "@/types";
+import type {
+  Producto,
+  PedidoCreate,
+  PedidoOut,
+  Token,
+  LocalConfig,
+} from "@/types";
 
 export const api = {
   // Productos (tienda)
@@ -57,6 +63,9 @@ export const api = {
   // Pedidos (lo llama el cliente al finalizar el carrito)
   createPedido: (p: PedidoCreate) =>
     request<PedidoOut>("/pedidos", { method: "POST", body: JSON.stringify(p) }),
+
+  // Config del local (público: la leen footer, /contacto y el carrito)
+  getConfig: () => request<LocalConfig>("/config"),
 
   // Auth
   login: (username: string, password: string) =>
@@ -78,6 +87,23 @@ export const api = {
       ),
     deleteProducto: (id: number) =>
       request<null>(`/productos/${id}`, { method: "DELETE" }, true),
+
+    // Combos (categoria="combo"): precio propio + componentes
+    createCombo: (c: {
+      nombre: string;
+      descripcion?: string | null;
+      precio: number;
+      etiqueta?: string;
+      stock: number;
+      items: { producto_id: number; cantidad: number }[];
+    }) =>
+      request<Producto>("/combos", { method: "POST", body: JSON.stringify(c) }, true),
+    updateCombo: (id: number, c: Partial<Producto> & { items?: { producto_id: number; cantidad: number }[] }) =>
+      request<Producto>(`/combos/${id}`, { method: "PUT", body: JSON.stringify(c) }, true),
+    setComboActivo: (id: number, activo: boolean) =>
+      request<Producto>(`/combos/${id}/activo`, { method: "PATCH", body: JSON.stringify({ activo }) }, true),
+    deleteCombo: (id: number) =>
+      request<null>(`/combos/${id}`, { method: "DELETE" }, true),
     uploadImagen: async (id: number, file: File) => {
       // Subida de archivo: se manda como multipart/form-data (no JSON).
       const fd = new FormData();
@@ -109,5 +135,9 @@ export const api = {
         {},
         true
       ),
+
+    // Config del local (Ajustes)
+    updateConfig: (c: Partial<LocalConfig>) =>
+      request<LocalConfig>("/config", { method: "PUT", body: JSON.stringify(c) }, true),
   },
 };

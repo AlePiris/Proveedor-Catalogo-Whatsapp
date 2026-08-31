@@ -7,9 +7,16 @@ legible y portable entre motores.
 
 Tablas:
   Producto     lo que vende la pizzería (pizza, empanada, bebida, postre...).
+               También los COMBOS (categoria="combo"): precio propio y
+               componentes en combo_items.
+  ComboItem    componente de un combo (producto + cantidad). Solo describe el
+               combo: al pedir, el combo entra como UNA línea (snapshot).
   AdminUser    el dueño (login). No hay usuarios clientes.
   Pedido       un pedido enviado por WhatsApp. Arranca "pendiente".
   PedidoItem   cada línea de un pedido (cantidad x producto).
+  LocalConfig  datos del local (dirección, contacto, radio de delivery...
+               horarios), UNA sola fila editable por el dueño desde el
+               dashboard (pestaña Ajustes).
 
 DECISIÓN CLAVE — snapshot en PedidoItem:
   En PedidoItem guardamos `nombre` y `precio_unitario` (copias del momento del
@@ -54,11 +61,29 @@ class Producto(Base):
     # alarma), el producto se muestra marcado como "Sin stock" aunque no haya.
     mostrar_sin_stock = Column(Boolean, default=False, nullable=False)
     orden = Column(Integer, default=0, nullable=False)  # menor = aparece primero
+    # Etiqueta libre para destacar el item (ej: "🍻 Día del Amigo", "Súper
+    # combo"). La usan los combos/especiales; en productos simples queda "".
+    etiqueta = Column(String(60), nullable=False, default="")
+    # Interruptor manual de visibilidad (lo usan los combos para apagarlos el
+    # día siguiente al festivo sin borrarlos). Producto simple siempre True.
+    activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relación inversa: los items que referencian este producto.
     items = relationship("PedidoItem", back_populates="producto")
+    # Si este producto ES un combo: sus componentes. foreign_keys necesario
+    # porque combo_items tiene DOS FKs contra productos (combo_id y producto_id).
+    combo_items = relationship(
+        "ComboItem",
+        back_populates="combo",
+        foreign_keys="ComboItem.combo_id",
+        cascade="all, delete-orphan",  # borrar el combo borra sus componentes
+    )
+    # Si este producto es COMPONENTE de combos: acá figura (solo lectura).
+    combos_que_lo_incluyen = relationship(
+        "ComboItem", back_populates="producto", foreign_keys="ComboItem.producto_id"
+    )
 
 
 class AdminUser(Base):
@@ -76,6 +101,14 @@ class Pedido(Base):
     id = Column(Integer, primary_key=True, index=True)
     cliente_nombre = Column(String(120), nullable=False)
     telefono = Column(String(30), nullable=False)
+    # Tipo de entrega: "takeaway" (retira en el local) o "delivery". El costo
+    # y el alcance real los confirma la pizzería por WhatsApp: acá solo queda
+    # REGISTRADO qué eligió el cliente y a dónde llevarlo.
+    tipo_entrega = Column(String(20), default="takeaway", nullable=False)
+    direccion = Column(String(200), nullable=True)  # solo para delivery
+    # Método de pago que el cliente eligió: "efectivo" o "mercado_pago". La
+    # pizzería lo cobra físicamente (no hay cobro online); esto solo informa.
+    metodo_pago = Column(String(30), default="efectivo", nullable=False)
     notas = Column(Text, nullable=True)
     total = Column(Numeric(10, 2), nullable=False)  # total de referencia (editable)
     estado = Column(String(20), default="pendiente", nullable=False)  # pendiente/confirmada/cancelada
@@ -96,10 +129,73 @@ class PedidoItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=False)
-    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=True)  # null si se borró
+    # NULL en dos casos: (1) el producto se borró del catálogo, (2) es un ítem
+    # "Otro" que el dueño agregó a mano en el editor (ej. "bacon extra").
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=True)
     nombre = Column(String(120), nullable=False)          # SNAPSHOT del nombre
     cantidad = Column(Integer, nullable=False)
     precio_unitario = Column(Numeric(10, 2), nullable=False)  # SNAPSHOT del precio
 
     pedido = relationship("Pedido", back_populates="items")
     producto = relationship("Producto", back_populates="items")
+
+
+class ComboItem(Base):
+    """
+    Componente de un combo: "este combo lleva N unidades del producto X".
+    Descriptivo, NO transaccional: cuando el cliente pide el combo entra como
+    UNA línea de PedidoItem (con el snapshot de nombre/precio del combo), los
+    componente NO se descuentan del stock — el combo tiene stock propio.
+
+    La cantidad y el producto que muestra el cliente salen de acá en vivo:
+    si el dueño arregla el combo, la web refleja el cambio al instante.
+    """
+
+    __tablename__ = "combo_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    combo_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    cantidad = Column(Integer, nullable=False)  # siempre > 0 (valida el router)
+
+    combo = relationship("Producto", back_populates="combo_items", foreign_keys=[combo_id])
+    producto = relationship(
+        "Producto",
+        back_populates="combos_que_lo_incluyen",
+        foreign_keys=[producto_id],
+    )
+
+    # Propiedades de lectura: nombre y precio ACTUAL del componente. La web los
+    # usa solo para DESCRIBIR el combo ("6x Empanada Carne"); lo que se cobra
+    # es el precio del propio combo. Si el dueño cambia el precio de una
+    # empanada, la descripción del combo se actualiza sola.
+    @property
+    def nombre(self) -> str:
+        return self.producto.nombre
+
+    @property
+    def precio_unitario(self):
+        return self.producto.precio
+
+
+class LocalConfig(Base):
+    """
+    Datos del local, EDITABLES por el dueño desde el dashboard (Ajustes).
+    Patrón singleton: siempre hay una sola fila (id=1). El GET público devuelve
+    defaults si la fila no existe todavía, así el frontend nunca se rompe.
+    """
+
+    __tablename__ = "local_config"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(120), nullable=False, default="Pizzería El Gordito")
+    direccion = Column(String(200), nullable=False, default="")
+    telefono = Column(String(30), nullable=False, default="")
+    # Número de WhatsApp para recibir los pedidos, formato internacional sin +
+    # (ej: "5491100000000"). Si queda vacío, el frontend usa VITE_WA_NUMBER.
+    whatsapp = Column(String(30), nullable=False, default="")
+    # Radio de delivery APROXIMADO en km, INFORMATIVO (se muestra al cliente,
+    # la pizzería confirma el alcance por WhatsApp). 0 = delivery deshabilitado.
+    radio_delivery_km = Column(Integer, nullable=False, default=0)
+    horarios = Column(String(200), nullable=False, default="")
+    descripcion = Column(Text, nullable=False, default="")

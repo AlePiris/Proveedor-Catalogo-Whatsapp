@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth, productos, pedidos, analisis
+from app.routers import auth, productos, pedidos, analisis, config_local
 
 app = FastAPI(
     title="Pizzería API",
@@ -42,8 +42,10 @@ app.add_middleware(
 # Montamos los routers. Cada uno trae sus rutas bajo su prefijo.
 app.include_router(auth.router)
 app.include_router(productos.router)
+app.include_router(productos.combos_router)
 app.include_router(pedidos.router)
 app.include_router(analisis.router)
+app.include_router(config_local.router)
 
 
 @app.get("/api/health")

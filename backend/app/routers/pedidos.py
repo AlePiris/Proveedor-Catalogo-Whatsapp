@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.database import get_db
-from app.models import Pedido, PedidoItem, Producto, AdminUser
+from app.models import Pedido, PedidoItem, Producto, AdminUser, LocalConfig
 from app.schemas import PedidoCreate, PedidoOut, PedidoUpdate
 
 router = APIRouter(tags=["pedidos"])
@@ -32,12 +32,33 @@ router = APIRouter(tags=["pedidos"])
 # ---------- Helpers ----------
 def _construir_items(items_in, db: Session) -> list[PedidoItem]:
     """
-    Convierte los items que vienen del cliente (producto_id + cantidad) en
-    PedidoItem ORM, tomando el SNAPSHOT de nombre y precio de la DB.
-    Lanza 400 si algún producto no existe.
+    Convierte los items que vienen del cliente/dueño en PedidoItem ORM.
+      - Con producto_id: SNAPSHOT de nombre y precio desde la DB (el precio
+        vigente lo decide SIEMPRE el backend, no el cliente). 400 si no existe.
+      - Sin producto_id (ítem "Otro" que agrega el dueño en el editor): requiere
+        nombre + precio_unitario; queda como snapshot puro de este pedido.
     """
     items_orm = []
     for it in items_in:
+        if it.producto_id is None:
+            # Ítem "Otro": el nombre lo escribe el dueño y el precio lo pone él,
+            # así que acá SÍ se acepta el precio que viene (es rol admin).
+            nombre = (it.nombre or "").strip()
+            if not nombre or it.precio_unitario is None or it.precio_unitario < 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail='El ítem "Otro" necesita nombre y precio (el precio puede ser 0)',
+                )
+            items_orm.append(
+                PedidoItem(
+                    producto_id=None,       # no sale del catálogo
+                    nombre=nombre,
+                    cantidad=it.cantidad,
+                    precio_unitario=it.precio_unitario,
+                )
+            )
+            continue
+
         producto = db.query(Producto).filter(Producto.id == it.producto_id).first()
         if producto is None:
             raise HTTPException(
@@ -62,6 +83,42 @@ def _recalcular_total(pedido: Pedido) -> None:
     pedido.total = sum(i.cantidad * i.precio_unitario for i in pedido.items)
 
 
+def _validar_entrega(db: Session, datos: PedidoCreate) -> tuple[str, str | None]:
+    """
+    Valida tipo_entrega + direccion contra la config del local:
+      - El valor tiene que ser "takeaway" o "delivery" (nada libre).
+      - Delivery solo si el dueño configuró radio > 0 (si es 0, deshabilitado).
+      - Delivery exige dirección (para que al dueño le llegue a domicilio adónde).
+    Devuelve (tipo_entrega, direccion_limpia o None) para guardar en el pedido.
+    """
+    tipo = (datos.tipo_entrega or "takeaway").strip().lower()
+    if tipo not in ("takeaway", "delivery"):
+        raise HTTPException(status_code=400, detail="tipo_entrega debe ser 'takeaway' o 'delivery'")
+
+    if tipo == "takeaway":
+        return tipo, None
+
+    config = db.query(LocalConfig).filter(LocalConfig.id == 1).first()
+    if config is None or config.radio_delivery_km <= 0:
+        raise HTTPException(status_code=400, detail="La pizzería no tiene delivery disponible")
+
+    direccion = (datos.direccion or "").strip()
+    if not direccion:
+        raise HTTPException(status_code=400, detail="Delivery requiere una dirección de entrega")
+    return tipo, direccion
+
+
+def _validar_metodo_pago(metodo: str | None) -> str:
+    """
+    El pago SIEMPRE es coordinado por WhatsApp (no hay cobro online). Acá solo
+    aseguramos que quede registrado un valor conocido para el dashboard.
+    """
+    metodo = (metodo or "efectivo").strip().lower()
+    if metodo not in ("efectivo", "mercado_pago"):
+        raise HTTPException(status_code=400, detail="metodo_pago debe ser 'efectivo' o 'mercado_pago'")
+    return metodo
+
+
 # ---------- Públicos ----------
 @router.post("/api/pedidos", response_model=PedidoOut, status_code=201)
 def crear_pedido(datos: PedidoCreate, db: Session = Depends(get_db)):
@@ -70,9 +127,14 @@ def crear_pedido(datos: PedidoCreate, db: Session = Depends(get_db)):
     El total se calcula acá (no se confía en el cliente).
     """
     items_orm = _construir_items(datos.items, db)
+    tipo_entrega, direccion = _validar_entrega(db, datos)
+    metodo_pago = _validar_metodo_pago(datos.metodo_pago)
     pedido = Pedido(
         cliente_nombre=datos.cliente_nombre,
         telefono=datos.telefono,
+        tipo_entrega=tipo_entrega,
+        direccion=direccion,
+        metodo_pago=metodo_pago,
         notas=datos.notas,
         estado="pendiente",
         items=items_orm,
@@ -141,6 +203,8 @@ def editar_pedido(
         pedido.telefono = datos.telefono
     if datos.notas is not None:
         pedido.notas = datos.notas
+    if datos.metodo_pago is not None:
+        pedido.metodo_pago = _validar_metodo_pago(datos.metodo_pago)
 
     # Reemplazo completo de items (simple y predecible para el frontend).
     if datos.items is not None:
