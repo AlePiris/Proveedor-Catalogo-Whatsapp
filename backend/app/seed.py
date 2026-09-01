@@ -9,7 +9,7 @@ El admin arranca con admin / admin123 (solo para desarrollo; en producción
 definir un password fuerte o cargarlo por variable de entorno).
 """
 from app.database import SessionLocal
-from app.models import Producto, AdminUser, LocalConfig
+from app.models import Producto, AdminUser, LocalConfig, Categoria
 from app.auth import hash_password
 
 # Fila única de config del local: se crea SOLO si no existe, con campos vacíos
@@ -27,6 +27,16 @@ LOCAL_DEFAULT = dict(
     descripcion="Pizzas caseras a horno de leña.",
 )
 
+
+# Categorías base del menú: el `orden` decide en qué posición aparece la
+# sección en la tienda (menor = antes). Los nombres DEBEN matchear el valor
+# `categoria` de los productos del CATALOGO de abajo (match por nombre).
+CATEGORIAS_BASE = [
+    ("pizza", 1),
+    ("empanada", 2),
+    ("bebida", 3),
+    ("postre", 4),
+]
 
 CATALOGO = [
     # (nombre, descripcion, precio, precio_oferta, en_oferta, stock, categoria, orden)
@@ -56,6 +66,15 @@ def main():
             print("Admin creado: admin / admin123")
         else:
             print("El admin ya existe (no se recrea).")
+
+        # Categorías: las base solo si no existe NINGUNA (si el dueño borró o
+        # renombró categorías a mano, no las volvemos a meter).
+        if db.query(Categoria).count() == 0:
+            for nombre, orden in CATEGORIAS_BASE:
+                db.add(Categoria(nombre=nombre, orden=orden))
+            print(f"Cargadas {len(CATEGORIAS_BASE)} categorías base.")
+        else:
+            print("Ya hay categorías (no se duplican).")
 
         # Productos: solo si la tabla está vacía.
         if db.query(Producto).count() == 0:

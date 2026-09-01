@@ -99,8 +99,23 @@ interface ItemEdit {
   producto_id: number | null;
   nombre: string;
   precio: number; // en productos es informativo (el backend lo recalcula); en "Otro" lo edita el dueño
-  cantidad: number;
+  // "" mientras el dueño borra el número para retipearlo; guardar exige >= 1
+  // (una fila en 0 o vacía se entiende como "quitarla", igual que antes).
+  cantidad: number | "";
+  // Elecciones guardadas del combo (ej: Bebida -> 1 Coca, Empanadas -> 3 Carne
+  // + 3 Queso). Se reenvían INTACTAS al guardar: el backend exige que la suma
+  // del grupo dé exacto y no debe cambiar lo que el cliente eligió solo porque
+  // el dueño corrigió una cantidad.
+  elecciones?: { grupo: string; producto_id: number; nombre: string; cantidad: number }[] | null;
 }
+
+// El input se puede borrar del todo mientras se retipea: "" queda en el
+// estado; el guardar lo trata como "cantidad inválida" (no se manda al backend).
+const leerCantidad = (v: string): number | "" => {
+  if (v === "") return "";
+  const n = parseInt(v);
+  return isNaN(n) ? "" : n;
+};
 
 // Tarjeta de un pedido. Cuando se edita, muestra inputs de cantidad por item.
 function PedidoCard({
@@ -141,6 +156,7 @@ function PedidoCard({
           nombre: it.nombre,
           precio: it.precio_unitario,
           cantidad: it.cantidad,
+          elecciones: it.elecciones ?? null,
         }))
       );
       setMetodoPagoEdit(pedido.metodo_pago);
@@ -149,7 +165,11 @@ function PedidoCard({
   }, [editando, pedido.items, pedido.metodo_pago]);
 
   // Total "en vivo" del editor (el definitivo lo recalcula el backend).
-  const totalEdicion = itemsEdit.reduce((s, f) => s + f.cantidad * f.precio, 0);
+  // Cantidad vacía ("") aporta 0 hasta que se complete.
+  const totalEdicion = itemsEdit.reduce(
+    (s, f) => s + (typeof f.cantidad === "number" ? f.cantidad : 0) * f.precio,
+    0
+  );
 
   function agregarOtro() {
     setErrorEdicion(null);
@@ -161,8 +181,13 @@ function PedidoCard({
 
   // Arma el payload y guarda. Validaciones acá para feedback inmediato
   // (el backend revalida igual: nombre y precio para los "Otro").
+  // Una fila con cantidad vacía no se manda: igual que 0, se interpreta
+  // como "quitarla del pedido".
   function guardarCambios() {
-    const filas = itemsEdit.filter((f) => f.cantidad > 0);
+    const filas = itemsEdit.filter(
+      (f): f is ItemEdit & { cantidad: number } =>
+        typeof f.cantidad === "number" && f.cantidad > 0
+    );
     const otraInvalida = filas.some((f) => !f.producto_id && (!f.nombre.trim() || f.precio < 0));
     if (otraInvalida) {
       setErrorEdicion('Cada ítem "Otro" necesita nombre y precio (el precio puede ser 0).');
@@ -176,7 +201,7 @@ function PedidoCard({
       pedido,
       filas.map((f) =>
         f.producto_id
-          ? { producto_id: f.producto_id, cantidad: f.cantidad }
+          ? { producto_id: f.producto_id, cantidad: f.cantidad, elecciones: f.elecciones ?? null }
           : { nombre: f.nombre.trim(), precio_unitario: f.precio, cantidad: f.cantidad }
       ),
       metodoPagoEdit
@@ -225,17 +250,28 @@ function PedidoCard({
                     <span className="text-gray-400">
                       (${f.precio.toLocaleString("es-AR")} c/u)
                     </span>
+                    {/* Las elecciones del cliente se conservan (no se editan
+                        acá): cambiar qué bebida pidió el cliente es rehacer
+                        el pedido, no corregirlo. */}
+                    {(f.elecciones?.length ?? 0) > 0 && (
+                      <span className="text-marca text-xs font-medium">
+                        {" "}
+                        ({f.elecciones!.map((e) =>
+                          `${e.grupo}: ${e.cantidad !== 1 ? `${e.cantidad}× ` : ""}${e.nombre}`
+                        ).join("; ")})
+                      </span>
+                    )}
                   </span>
                   <input
                     type="number"
                     min={0}
                     className="border rounded px-1 py-0.5 w-14"
                     value={f.cantidad}
-                    onChange={(e) => editarFila(f.key, (x) => ({ ...x, cantidad: parseInt(e.target.value) || 0 }))}
+                    onChange={(e) => editarFila(f.key, (x) => ({ ...x, cantidad: leerCantidad(e.target.value) }))}
                     aria-label={`Cantidad de ${f.nombre}`}
                   />
                   <span className="w-20 text-right">
-                    ${(f.cantidad * f.precio).toLocaleString("es-AR")}
+                    ${((typeof f.cantidad === "number" ? f.cantidad : 0) * f.precio).toLocaleString("es-AR")}
                   </span>
                   <button
                     onClick={() => setItemsEdit((fs) => fs.filter((x) => x.key !== f.key))}
@@ -270,11 +306,11 @@ function PedidoCard({
                     min={0}
                     className="border rounded px-1 py-0.5 w-14"
                     value={f.cantidad}
-                    onChange={(e) => editarFila(f.key, (x) => ({ ...x, cantidad: parseInt(e.target.value) || 0 }))}
+                    onChange={(e) => editarFila(f.key, (x) => ({ ...x, cantidad: leerCantidad(e.target.value) }))}
                     aria-label="Cantidad del extra"
                   />
                   <span className="w-20 text-right">
-                    ${(f.cantidad * f.precio).toLocaleString("es-AR")}
+                    ${((typeof f.cantidad === "number" ? f.cantidad : 0) * f.precio).toLocaleString("es-AR")}
                   </span>
                   <button
                     onClick={() => setItemsEdit((fs) => fs.filter((x) => x.key !== f.key))}
@@ -301,7 +337,14 @@ function PedidoCard({
         <ul className="text-sm space-y-1 mb-2">
           {pedido.items.map((it) => (
             <li key={it.id} className="flex justify-between">
-              <span>{it.cantidad}x {it.nombre}</span>
+              <span>
+                {it.cantidad}x {it.nombre}
+                {/* Qué eligió el cliente en los grupos del combo
+                    ("Bebida: Coca 1.5L"): el dueño necesita saber qué entregar. */}
+                {it.detalle && (
+                  <span className="text-marca font-medium"> — {it.detalle}</span>
+                )}
+              </span>
               <span>${(it.cantidad * it.precio_unitario).toLocaleString("es-AR")}</span>
             </li>
           ))}

@@ -26,6 +26,7 @@ DECISIÓN CLAVE — snapshot en PedidoItem:
   análisis "lo más vendido" se rompería. Por eso `producto_id` además es
   nullable: si se borra el producto, el item sobrevive con su snapshot.
 """
+import json
 from datetime import datetime
 
 from sqlalchemy import (
@@ -139,13 +140,64 @@ class PedidoItem(Base):
     pedido = relationship("Pedido", back_populates="items")
     producto = relationship("Producto", back_populates="items")
 
+    # Elecciones del cliente en los grupos del combo ("Bebida: Coca", "6
+    # empanadas: 3 Carne + 3 Queso"): JSON con [{"grupo": ..., "producto_id":
+    # ..., "nombre": ..., "cantidad": ...}]. NULL si el item no es un combo
+    # con grupos. Guardar QUÉ y CUÁNTO eligió sirve para tres cosas:
+    #   1) el dueño sabe qué entregar (dashboard y WhatsApp lo muestran),
+    #   2) el stock se descuenta del producto ELEGIDO,
+    #   3) si el pedido se cancela, se reintegra exactamente eso.
+    elecciones = Column(Text, nullable=True)
+
+    @property
+    def detalle(self) -> str | None:
+        """Las elecciones en texto legible, agrupadas: "Empanada: 3× Carne + 3×
+        Queso; Bebida: Coca 1.5L". None si el item no tuvo elecciones. Lo
+        expone el schema PedidoItemOut."""
+        if not self.elecciones:
+            return None
+        try:
+            pares = json.loads(self.elecciones)
+        except (TypeError, ValueError):
+            return None  # JSON corrupto: mejor no romper el pedido histórico
+        por_grupo: dict[str, list[str]] = {}
+        orden: list[str] = []
+        for e in pares:
+            grupo, nombre = e.get("grupo"), e.get("nombre")
+            if not grupo or not nombre:
+                continue
+            cantidad = e.get("cantidad", 1)
+            if grupo not in por_grupo:
+                por_grupo[grupo] = []
+                orden.append(grupo)
+            por_grupo[grupo].append(f"{cantidad}× {nombre}" if cantidad and cantidad != 1 else nombre)
+        partes = [f"{g}: {' + '.join(por_grupo[g])}" for g in orden]
+        return "; ".join(partes) or None
+
+    @property
+    def elecciones_data(self) -> list[dict] | None:
+        """Las elecciones como lista (para el OUT). Sirve al EDITOR de pedidos:
+        al reemplazar los items, el dueño reenvía las elecciones del combo
+        intactas (si no, el backend las exigiría de nuevo)."""
+        if not self.elecciones:
+            return None
+        try:
+            return json.loads(self.elecciones)
+        except (TypeError, ValueError):
+            return None
+
 
 class ComboItem(Base):
     """
     Componente de un combo: "este combo lleva N unidades del producto X".
-    Descriptivo, NO transaccional: cuando el cliente pide el combo entra como
-    UNA línea de PedidoItem (con el snapshot de nombre/precio del combo), los
-    componente NO se descuentan del stock — el combo tiene stock propio.
+
+    TRANSACCIONAL: el combo NO tiene stock propio — su disponibilidad es
+    CUÁNTOS COMBOS SE PUEDEN ARMAR con el stock actual del local
+    (min(stock_componente // cantidad), calculado en routers/productos.py).
+    Al pedirlo, la UNA línea de PedidoItem (snapshot de nombre/precio del
+    combo) se traduce en un descuento de N unidades de CADA componente
+    (ver _movimientos_stock en routers/pedidos.py, que también reintegra
+    las unidades si el pedido se cancela o edita).
 
     La cantidad y el producto que muestra el cliente salen de acá en vivo:
     si el dueño arregla el combo, la web refleja el cambio al instante.
@@ -157,6 +209,10 @@ class ComboItem(Base):
     combo_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
     producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
     cantidad = Column(Integer, nullable=False)  # siempre > 0 (valida el router)
+    # GRUPO A ELECCIÓN: las filas que comparten el mismo label (ej: "Bebida")
+    # son OPCIONES alternativas — el cliente elige UNA. NULL = componente fijo
+    # (siempre entra al combo, se descuenta siempre).
+    grupo = Column(String(40), nullable=True)
 
     combo = relationship("Producto", back_populates="combo_items", foreign_keys=[combo_id])
     producto = relationship(
@@ -176,6 +232,38 @@ class ComboItem(Base):
     @property
     def precio_unitario(self):
         return self.producto.precio
+
+    # Stock ACTUAL del componente: el selector de los grupos a elección lo usa
+    # para no ofrecer (por default) una opción que ya no tiene unidades.
+    @property
+    def stock(self) -> int:
+        return self.producto.stock
+
+
+class Categoria(Base):
+    """
+    Categorías del menú (Pizza, Empanada, Bebida, Postre...), EDITABLES por el
+    dueño desde el dashboard. La tienda las usa para mostrar los productos en
+    SECCIONES (una por categoría) ordenadas por `orden`.
+
+    DECISIÓN — match por NOMBRE, sin FK:
+      Producto.categoria sigue siendo un String(40) que guarda el nombre de la
+      categoría, NO una FK a esta tabla. ¿Por qué? Agregar una FK a una tabla
+      existente exigiría recrearla (SQLite no soporta ALTER TABLE ADD CONSTRAINT),
+      y el patrón de micromigraciones del proyecto solo permite ADD COLUMN.
+      Matchear por nombre es igual de correcto mientras los RENOMBRES se hagan
+      por el endpoint PUT, que actualiza en cascada los productos que la usan.
+
+    "combo" es un nombre RESERVADO: esa pseudo-categoría la fija el backend al
+    crear combos (los separa del menú común), nunca aparece acá.
+    """
+
+    __tablename__ = "categorias"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(40), unique=True, nullable=False, index=True)
+    # Menor = la sección aparece antes en la tienda.
+    orden = Column(Integer, default=0, nullable=False)
 
 
 class LocalConfig(Base):

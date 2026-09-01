@@ -32,6 +32,7 @@ from app.models import (  # noqa: F401
     PedidoItem,
     LocalConfig,
     ComboItem,
+    Categoria,
 )
 
 # Cada tupla: (tabla, columna, SQL completo del ALTER).
@@ -62,6 +63,16 @@ MICROMIGRACIONES = [
         "productos",
         "activo",
         "ALTER TABLE productos ADD COLUMN activo BOOLEAN DEFAULT 1 NOT NULL",
+    ),
+    (
+        "combo_items",
+        "grupo",
+        "ALTER TABLE combo_items ADD COLUMN grupo VARCHAR(40)",
+    ),
+    (
+        "pedido_items",
+        "elecciones",
+        "ALTER TABLE pedido_items ADD COLUMN elecciones TEXT",
     ),
 ]
 

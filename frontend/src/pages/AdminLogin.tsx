@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, setToken, getToken } from "@/api/client";
 
 export default function AdminLogin() {
@@ -48,6 +48,12 @@ export default function AdminLogin() {
         <button className="w-full bg-marca text-white py-2 rounded-lg font-semibold hover:bg-marca-oscura">
           Entrar
         </button>
+        <Link
+          to="/"
+          className="block text-center text-sm text-gray-500 hover:text-marca"
+        >
+          ← Volver a la tienda
+        </Link>
         <p className="text-xs text-gray-400 text-center">Demo: admin / admin123</p>
       </form>
     </div>

@@ -32,6 +32,19 @@ class ProductoVendido(BaseModel):
     ingreso_total: Decimal
 
 
+class VentaPorDia(BaseModel):
+    """Resultado del endpoint "ventas por día": un renglón por día.
+
+    fecha: "YYYY-MM-DD" (agrupamos por día de created_at del pedido).
+    pedidos / unidades / ingreso: agregados de los pedidos CONFIRMADOS
+    de ese día. Los días sin ventas van incluidos con ceros (así el
+    gráfico del dueño muestra los huecos, no los oculta)."""
+    fecha: str
+    pedidos: int
+    unidades: int
+    ingreso_total: Decimal
+
+
 # ---------- Productos ----------
 class ProductoBase(BaseModel):
     """Campos compartidos entre crear/editar/ver."""
@@ -92,30 +105,64 @@ class ProductoOut(ProductoBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ---------- Categorías ----------
+class CategoriaCreate(BaseModel):
+    """Para crear una categoría. El nombre debe matchear (por convención) el
+    valor que se guarda en Producto.categoria."""
+    nombre: str = Field(min_length=1, max_length=40)
+    orden: int = 0
+
+
+class CategoriaUpdate(BaseModel):
+    """Para editar: todo opcional (solo lo que viene). Si viene `nombre`, el
+    router renombra en cascada los productos con el nombre anterior."""
+    nombre: Optional[str] = Field(default=None, min_length=1, max_length=40)
+    orden: Optional[int] = None
+
+
+class CategoriaOut(BaseModel):
+    """Lo que ve el cliente (para armar las secciones) y el admin (para el
+    select del form de productos)."""
+    id: int
+    nombre: str
+    orden: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ---------- Combos ----------
 class ComboItemIn(BaseModel):
-    """Componente de un combo que manda el dueño (producto + cantidad)."""
+    """Componente de un combo que manda el dueño (producto + cantidad).
+
+    grupo: si está, TODAS las filas con el mismo label son OPCIONES a
+    elección ("Bebida": Coca, Agua...). El cliente elige UNA de ellas al
+    pedir el combo. NULL/vacío = componente fijo (siempre entra)."""
     producto_id: int
     cantidad: int = Field(gt=0)
+    grupo: Optional[str] = None
 
 
 class ComboItemOut(BaseModel):
-    """Componente para mostrarlo en la web: con nombre y precio ACTUAL del
-    producto (el precio "real"/de venta del combo es el del propio combo)."""
+    """Componente para mostrarlo en la web: con nombre, precio y stock ACTUAL
+    del producto (el precio "real"/de venta del combo es el del propio combo).
+    El stock lo usa el selector de los grupos a elección para preseleccionar
+    una opción que tenga unidades."""
     producto_id: int
     cantidad: int
     nombre: str
     precio_unitario: Decimal
+    stock: int
+    grupo: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class ComboCreate(BaseModel):
-    """Crea un combo (categoria='combo' fija): precio propio + componentes."""
+    """Crea un combo (categoria='combo' fija): precio propio + componentes.
+    SIN stock: la disponibilidad del combo se calcula desde el stock de sus
+    componentes (cuántos combos se pueden armar con lo que hay en el local)."""
     nombre: str
     descripcion: Optional[str] = None
     precio: Decimal
     etiqueta: str = ""          # badge opcional (ej: "🍻 Día del Amigo")
-    stock: int = 0
     imagen_url: Optional[str] = None
     items: list[ComboItemIn]    # mínimo 1, valida el router
 
@@ -126,7 +173,6 @@ class ComboUpdate(BaseModel):
     descripcion: Optional[str] = None
     precio: Optional[Decimal] = None
     etiqueta: Optional[str] = None
-    stock: Optional[int] = None
     items: Optional[list[ComboItemIn]] = None
 
 
@@ -150,6 +196,26 @@ class LoginRequest(BaseModel):
 
 
 # ---------- Pedidos ----------
+class EleccionOut(BaseModel):
+    """La elección guardada en el pedido (para que el editor del dueño pueda
+    reenviarla intacta al reemplazar los items)."""
+    grupo: str
+    producto_id: int
+    nombre: str
+    cantidad: int
+
+
+class EleccionCreate(BaseModel):
+    """La elección del cliente dentro de un GRUPO del combo: cuántas unidades
+    de ese producto ocupan el lugar del grupo. El grupo es "N unidades a
+    repartir entre las opciones": 6 empanadas -> 3 Carne + 3 Queso; una bebida
+    (N=1) -> 1 Coca. La SUMA de las cantidades del grupo debe dar exactamente
+    N (lo valida el router)."""
+    grupo: str
+    producto_id: int
+    cantidad: int = Field(gt=0)
+
+
 class PedidoItemCreate(BaseModel):
     """
     Una línea del pedido. Dos formas válidas (excluyentes, valida el router):
@@ -159,11 +225,15 @@ class PedidoItemCreate(BaseModel):
         cuando el cliente pidió algo fuera del menú, ej. "bacon extra").
         Requiere nombre + precio_unitario. Vive solo como snapshot de ESTE
         pedido (producto_id queda NULL, igual que un producto borrado).
+
+    Si el producto es un combo con grupos a elección, `elecciones` DEBE traer
+    una elección por grupo (lo valida el router).
     """
     producto_id: Optional[int] = None
     nombre: Optional[str] = None      # solo para el ítem "Otro"
     precio_unitario: Optional[Decimal] = None  # solo para el ítem "Otro" (lo pone el dueño)
     cantidad: int = Field(gt=0)  # debe ser > 0
+    elecciones: Optional[list[EleccionCreate]] = None  # solo para combos con grupos
 
 
 class PedidoItemOut(BaseModel):
@@ -172,6 +242,15 @@ class PedidoItemOut(BaseModel):
     nombre: str
     cantidad: int
     precio_unitario: Decimal
+    # Elecciones legibles del combo ("Bebida: Coca 1.5L"); None si no hubo.
+    # Lo arma la propiedad PedidoItem.detalle (models.py).
+    detalle: Optional[str] = None
+    # Elecciones ESTRUCTURADAS (grupo/producto_id/nombre): para el editor.
+    # OJO con el alias: el PedidoItem ORM tiene una COLUMNA "elecciones" (el
+    # JSON crudo en texto) y una PROPIEDAD "elecciones_data" (la lista parseada).
+    # Sin validation_alias, from_attributes leería la columna y Pydantic
+    # reventaría intentando validar un string como lista.
+    elecciones: Optional[list[EleccionOut]] = Field(default=None, validation_alias="elecciones_data")
     model_config = ConfigDict(from_attributes=True)
 
 

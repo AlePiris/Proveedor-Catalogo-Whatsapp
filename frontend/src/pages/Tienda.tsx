@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api/client";
-import type { Producto } from "@/types";
+import type { Categoria, Producto } from "@/types";
 import { precioEfectivo } from "@/types";
 import { useCart } from "@/context/CartContext";
 import { esCombo } from "@/types";
@@ -11,6 +11,7 @@ import Footer from "@/components/Footer";
 
 export default function Tienda() {
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { items, setCantidad, clear, total, totalItems } = useCart();
@@ -27,19 +28,42 @@ export default function Tienda() {
     prevTotal.current = totalItems;
   }, [totalItems]);
 
-  // Al montar, pedimos los productos. El backend ya los devuelve ordenados
-  // (ofertas primero), pero acá los separamos en dos secciones para mostrarlas.
+  // Al montar, pedimos los productos y las categorías. El backend ya los
+  // devuelve ordenados (ofertas primero), pero acá los separamos en secciones.
   useEffect(() => {
     api
       .getProductos()
       .then((data) => setProductos(data))
       .catch((e) => setError(e.message))
       .finally(() => setCargando(false));
+    // Categorías: las usa el orden de las secciones de abajo. Si falla el
+    // GET, NO es fatal: las secciones igual se muestran (al final, orden
+    // alfabético) — la tienda no depende de esta tabla para funcionar.
+    api.getCategorias().then(setCategorias).catch(() => {});
   }, []);
 
   const combos = productos.filter(esCombo);
   const ofertas = productos.filter((p) => p.en_oferta && !esCombo(p));
   const resto = productos.filter((p) => !p.en_oferta && !esCombo(p));
+
+  // Agrupa el resto (ni combos ni ofertas) UNA SECCIÓN POR CATEGORÍA, en el
+  // orden que definió el dueño en la tabla de categorías. Las categorías que
+  // no existen en esa tabla (o si el GET falló) van al final en orden
+  // alfabético — así ningún producto se pierde por un problema de datos.
+  const porCategoria = new Map<string, Producto[]>();
+  for (const p of resto) {
+    const lista = porCategoria.get(p.categoria);
+    if (lista) lista.push(p);
+    else porCategoria.set(p.categoria, [p]);
+  }
+  const conocidas = categorias.filter((c) => porCategoria.has(c.nombre));
+  const desconocidas = [...porCategoria.keys()]
+    .filter((n) => !categorias.some((c) => c.nombre === n))
+    .sort((a, b) => a.localeCompare(b));
+  const secciones = [
+    ...conocidas.map((c) => ({ nombre: c.nombre, productos: porCategoria.get(c.nombre)! })),
+    ...desconocidas.map((n) => ({ nombre: n, productos: porCategoria.get(n)! })),
+  ];
 
   // Slides del carrusel: primero los combos, después las ofertas. Cada slide
   // sabe a qué sección lleva al usuario cuando lo tocan (scroll a la sección).
@@ -96,17 +120,19 @@ export default function Tienda() {
               </section>
             )}
 
-            {/* Resto del catálogo. */}
-            {resto.length > 0 && (
-              <section>
-                <h2 className="text-xl font-bold mb-3">Productos</h2>
+            {/* Resto del catálogo: UNA SECCIÓN POR CATEGORÍA (Pizzas,
+                Empanadas, Bebidas, Postres...), en el orden que definió el
+                dueño. Solo se muestran las categorías con productos. */}
+            {secciones.map((sec) => (
+              <section key={sec.nombre} id={`cat-${sec.nombre}`} className="mb-8 scroll-mt-20">
+                <h2 className="text-xl font-bold text-marca mb-3">{capitalizar(sec.nombre)}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {resto.map((p) => (
+                  {sec.productos.map((p) => (
                     <ProductoCard key={p.id} producto={p} />
                   ))}
                 </div>
               </section>
-            )}
+            ))}
 
             {!cargando && !error && productos.length === 0 && (
               <p>No hay productos cargados todavía.</p>
@@ -187,6 +213,12 @@ export default function Tienda() {
       <Footer />
     </div>
   );
+}
+
+// "pizza" -> "Pizza": título lindo para la sección sin guardar un "nombre
+// de display" aparte en la DB (la categoría es un string único).
+function capitalizar(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // ---------- Carrusel de promos (combos + ofertas) ----------

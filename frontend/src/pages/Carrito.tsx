@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/api/client";
 import { useCart } from "@/context/CartContext";
-import { precioEfectivo, type LocalConfig, type TipoEntrega, type TipoPago } from "@/types";
+import { precioEfectivo, textoElecciones, type LocalConfig, type TipoEntrega, type TipoPago } from "@/types";
 import Navbar from "@/components/Navbar";
 
 export default function Carrito() {
@@ -62,17 +62,26 @@ export default function Carrito() {
         direccion: tipoEntrega === "delivery" ? direccion.trim() : null,
         metodo_pago: metodoPago,
         notas: notas.trim() || null,
-        items: items.map((i) => ({ producto_id: i.producto.id, cantidad: i.cantidad })),
+        items: items.map((i) => ({
+          producto_id: i.producto.id,
+          cantidad: i.cantidad,
+          // Solo los combos con grupos traen elecciones; el backend las valida.
+          elecciones: i.elecciones ?? null,
+        })),
       });
 
       // 2) ARMAMOS el mensaje de WhatsApp con el #ID del pedido.
+      //    En los combos, cada línea incluye qué eligió el cliente en cada
+      //    grupo (ej: "Bebida: Coca 1.5L"), para que el dueño sepa qué entregar.
       const lineas = items
-        .map(
-          (i) =>
-            `• ${i.cantidad}x ${i.producto.nombre} — $${precioEfectivo(i.producto).toLocaleString(
-              "es-AR"
-            )} c/u`
-        )
+        .map((i) => {
+          const detalle = textoElecciones(i.producto, i.elecciones);
+          return (
+            `• ${i.cantidad}x ${i.producto.nombre}${detalle ? ` (${detalle})` : ""} — $${precioEfectivo(
+              i.producto
+            ).toLocaleString("es-AR")} c/u`
+          );
+        })
         .join("\n");
       const entrega =
         tipoEntrega === "delivery" ? `🛵 Delivery — ${direccion.trim()}` : "🏪 Take away (retira en el local)";
@@ -129,6 +138,13 @@ export default function Carrito() {
                 <div key={i.producto.id} className="flex items-center justify-between bg-white border rounded-lg p-3">
                   <div>
                     <p className="font-semibold">{i.producto.nombre}</p>
+                    {/* Qué eligió el cliente en los grupos del combo
+                        ("Bebida: Coca 1.5L"), para confirmarlo antes de enviar. */}
+                    {textoElecciones(i.producto, i.elecciones) && (
+                      <p className="text-xs text-marca font-medium">
+                        {textoElecciones(i.producto, i.elecciones)}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-500">
                       ${precioEfectivo(i.producto).toLocaleString("es-AR")} c/u
                     </p>

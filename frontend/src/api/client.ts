@@ -53,12 +53,17 @@ import type {
   PedidoOut,
   Token,
   LocalConfig,
+  Categoria,
+  VentaPorDia,
 } from "@/types";
 
 export const api = {
   // Productos (tienda)
   getProductos: () => request<Producto[]>("/productos"),
   getProducto: (id: number) => request<Producto>(`/productos/${id}`),
+
+  // Categorías (tienda: para agrupar los productos en secciones)
+  getCategorias: () => request<Categoria[]>("/categorias"),
 
   // Pedidos (lo llama el cliente al finalizar el carrito)
   createPedido: (p: PedidoCreate) =>
@@ -88,17 +93,22 @@ export const api = {
     deleteProducto: (id: number) =>
       request<null>(`/productos/${id}`, { method: "DELETE" }, true),
 
-    // Combos (categoria="combo"): precio propio + componentes
+    // Combos (categoria="combo"): precio propio + componentes.
+    // SIN stock: la disponibilidad del combo sale del stock de sus componentes.
+    // `grupo` en un componente = fila de un grupo a elección (mismo label =
+    // opciones entre las que el cliente elige UNA; undefined = fijo).
     createCombo: (c: {
       nombre: string;
       descripcion?: string | null;
       precio: number;
       etiqueta?: string;
-      stock: number;
-      items: { producto_id: number; cantidad: number }[];
+      items: { producto_id: number; cantidad: number; grupo?: string | null }[];
     }) =>
       request<Producto>("/combos", { method: "POST", body: JSON.stringify(c) }, true),
-    updateCombo: (id: number, c: Partial<Producto> & { items?: { producto_id: number; cantidad: number }[] }) =>
+    updateCombo: (
+      id: number,
+      c: Partial<Producto> & { items?: { producto_id: number; cantidad: number; grupo?: string | null }[] }
+    ) =>
       request<Producto>(`/combos/${id}`, { method: "PUT", body: JSON.stringify(c) }, true),
     setComboActivo: (id: number, activo: boolean) =>
       request<Producto>(`/combos/${id}/activo`, { method: "PATCH", body: JSON.stringify({ activo }) }, true),
@@ -135,9 +145,20 @@ export const api = {
         {},
         true
       ),
+    getVentasPorDia: (dias = 7) =>
+      request<VentaPorDia[]>(`/admin/analisis/ventas-por-dia?dias=${dias}`, {}, true),
 
     // Config del local (Ajustes)
     updateConfig: (c: Partial<LocalConfig>) =>
       request<LocalConfig>("/config", { method: "PUT", body: JSON.stringify(c) }, true),
+
+    // Categorías (secciones del menú)
+    getCategorias: () => request<Categoria[]>("/categorias", {}, true),
+    createCategoria: (nombre: string, orden = 0) =>
+      request<Categoria>("/categorias", { method: "POST", body: JSON.stringify({ nombre, orden }) }, true),
+    updateCategoria: (id: number, cambios: { nombre?: string; orden?: number }) =>
+      request<Categoria>(`/categorias/${id}`, { method: "PUT", body: JSON.stringify(cambios) }, true),
+    deleteCategoria: (id: number) =>
+      request<null>(`/categorias/${id}`, { method: "DELETE" }, true),
   },
 };

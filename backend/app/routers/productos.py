@@ -63,6 +63,51 @@ combos_router = APIRouter(prefix="/api/combos", tags=["combos"])
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
 
 
+# ---------- Helpers de stock de combos ----------
+def _stock_combo_efectivo(combo: Producto) -> int:
+    """
+    Cuántos combos se pueden armar con el stock ACTUAL del local.
+      - Componentes FIJOS: el cuello de botella (min de stock // cantidad).
+      - GRUPOS a elección ("N unidades a repartir"): las unidades de TODAS las
+        opciones se suman — con 30 carne y 10 queso se arman 6 combos de 6
+        (el cliente mezcla gustos, así que da igual de cuál sea cada una).
+    Sin componentes (combo a medio armar) -> 0.
+    """
+    if not combo.combo_items:
+        return 0
+    fijos: list[int] = []
+    por_grupo: dict[str, tuple[int, int]] = {}  # grupo -> (N, stock total)
+    for ci in combo.combo_items:
+        if ci.grupo:
+            n, total = por_grupo.get(ci.grupo, (ci.cantidad, 0))
+            por_grupo[ci.grupo] = (n, total + ci.producto.stock)
+        else:
+            fijos.append(ci.producto.stock // ci.cantidad)
+    # Cada grupo aporta su stock total repartido; el combo se arma con el mínimo.
+    return min(fijos + [total // n for n, total in por_grupo.values()])
+
+
+def _aplicar_stock_combos(db: Session, productos: list[Producto]) -> list[Producto]:
+    """
+    Sobrescribe el `stock` de los combos con el stock EFECTIVO (calculado de
+    sus componentes). Así, para el resto de la app — card del cliente, carrito,
+    dashboard — el combo "tiene" stock igual que un producto simple, sin
+    necesidad de tocar el frontend: la disponibilidad ya es la correcta.
+
+    Detalle: lo hacemos sobre objetos DESACOPLADOS (db.expunge). Mutar .stock
+    de una instancia attachada a la sesión podría terminar escribiéndose en la
+    DB en el próximo commit; expunge corta ese riesgo (los componentes se
+    leen ANTES de expungear, mientras la relación lazy-load sigue viva).
+    """
+    for p in productos:
+        if p.categoria == "combo":
+            efectivo = _stock_combo_efectivo(p)
+            db.expunge(p)
+            p.stock = efectivo
+            p.disponible = efectivo > 0
+    return productos
+
+
 # ---------- Públicos ----------
 @router.get("", response_model=list[ProductoOut])
 def listar_productos(db: Session = Depends(get_db)):
@@ -72,27 +117,43 @@ def listar_productos(db: Session = Depends(get_db)):
     Además, TODO lo mostrado debe estar activo (los combos apagados no salen).
     Ordenados: ofertas primero, luego por 'orden' (la sección de combos la
     arma el frontend filtrando categoria='combo').
+
+    Combos: entran al query con su columna stock (siempre 0, ya no la usan) y
+    se filtran por su stock EFECTIVO (el que se puede armar con los componentes).
     """
-    return (
+    productos = (
         db.query(Producto)
         .filter(
-            or_(Producto.stock > 0, Producto.mostrar_sin_stock.is_(True)),
+            or_(
+                Producto.stock > 0,
+                Producto.mostrar_sin_stock.is_(True),
+                Producto.categoria == "combo",  # el filtro real es el stock efectivo
+            ),
             Producto.activo.is_(True),
         )
         .order_by(Producto.en_oferta.desc(), Producto.orden.asc())
         .all()
     )
+    _aplicar_stock_combos(db, productos)
+    # Con el stock efectivo ya calculado, aplica la misma regla de visibilidad
+    # que los productos simples (mostrar aunque esté en 0 si el dueño apagó la alarma).
+    return [
+        p for p in productos
+        if p.stock > 0 or p.mostrar_sin_stock
+    ]
 
 
 # Declarado ANTES que /{producto_id} para que "/admin" no choque con el path-param int.
 @router.get("/admin", response_model=list[ProductoOut])
 def listar_productos_admin(db: Session = Depends(get_db), _=Depends(require_admin)):
-    """Lista TODOS los productos (incluye los ocultos por sin-stock) para el dueño."""
-    return (
+    """Lista TODOS los productos (incluye los ocultos por sin-stock) para el
+    dueño. Los combos muestran su stock EFECTIVO (cuántos se pueden armar)."""
+    productos = (
         db.query(Producto)
         .order_by(Producto.en_oferta.desc(), Producto.orden.asc())
         .all()
     )
+    return _aplicar_stock_combos(db, productos)
 
 
 @router.get("/{producto_id}", response_model=ProductoOut)
@@ -100,7 +161,7 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return producto
+    return _aplicar_stock_combos(db, [producto])[0]
 
 
 # ---------- Admin ----------
@@ -236,7 +297,10 @@ def _obtener_combo(db: Session, combo_id: int) -> Producto:
 def _construir_combo_items(items_in, combo_id: int | None, db: Session) -> list[ComboItem]:
     """
     Convierte los componentes que manda el dueño en ComboItem ORM. Valida que
-    cada producto exista y que el combo no se incluya a sí mismo.
+    cada producto exista, que el combo no se incluya a sí mismo y la coherencia
+    de los GRUPOS a elección: mismo label en varias filas = opciones entre las
+    que el cliente elige una. Un grupo necesita al menos 2 opciones (una sola
+    no es una elección, es un componente fijo).
     """
     filas: list[ComboItem] = []
     vistos: set[int] = set()
@@ -250,10 +314,32 @@ def _construir_combo_items(items_in, combo_id: int | None, db: Session) -> list[
         ).first()
         if producto is None:
             raise HTTPException(status_code=400, detail=f"Producto {it.producto_id} no existe (o es otro combo)")
-        filas.append(ComboItem(combo_id=combo_id, producto_id=producto.id, cantidad=it.cantidad))
+        # Grupo: label normalizado. Cadena vacía = componente fijo.
+        grupo = (it.grupo or "").strip() or None
+        filas.append(ComboItem(combo_id=combo_id, producto_id=producto.id, cantidad=it.cantidad, grupo=grupo))
         vistos.add(producto.id)
     if not filas:
         raise HTTPException(status_code=400, detail="Un combo necesita al menos un componente")
+    # Coherencia de los grupos de elección: 2+ opciones y MISMA cantidad en
+    # todas las filas del grupo (el grupo es "N unidades a repartir": las
+    # opciones son alternativas para esos mismos N lugares).
+    cantidad_por_grupo: dict[str, int] = {}
+    n_por_grupo: dict[str, int] = {}
+    for fila in filas:
+        if fila.grupo:
+            cantidad_por_grupo[fila.grupo] = cantidad_por_grupo.get(fila.grupo, 0) + 1
+            previa = n_por_grupo.setdefault(fila.grupo, fila.cantidad)
+            if previa != fila.cantidad:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Las opciones de '{fila.grupo}' deben tener la misma cantidad ({previa}): son {previa} lugares a repartir",
+                )
+    for grupo, cantidad in cantidad_por_grupo.items():
+        if cantidad < 2:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El grupo '{grupo}' necesita al menos 2 opciones a elección",
+            )
     return filas
 
 
@@ -263,7 +349,9 @@ def crear_combo(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
-    """Crea un combo: una fila en productos (categoria='combo') + componentes."""
+    """Crea un combo: una fila en productos (categoria='combo') + componentes.
+    El combo NO tiene stock propio: su disponibilidad se calcula desde el
+    stock de sus componentes (ver _stock_combo_efectivo)."""
     if datos.precio <= 0:
         raise HTTPException(status_code=400, detail="El precio del combo debe ser mayor a 0")
     componentes = _construir_combo_items(datos.items, None, db)
@@ -271,17 +359,18 @@ def crear_combo(
         nombre=datos.nombre,
         descripcion=datos.descripcion,
         precio=datos.precio,
-        stock=datos.stock,
+        stock=0,                    # columna ignorada: el stock sale de los componentes
         categoria="combo",          # fija: así el frontend lo separa en su sección
         etiqueta=datos.etiqueta,
         imagen_url=datos.imagen_url,
-        disponible=datos.stock > 0,
+        disponible=True,            # la visibilidad real la decide el stock efectivo
     )
     combo.combo_items = componentes
     db.add(combo)
     db.commit()
     db.refresh(combo)
-    return combo
+    # La respuesta lleva el stock EFECTIVO (los GETs ya lo calculan así).
+    return _aplicar_stock_combos(db, [combo])[0]
 
 
 @combos_router.put("/{combo_id}", response_model=ProductoOut)
@@ -312,7 +401,7 @@ def editar_combo(
 
     db.commit()
     db.refresh(combo)
-    return combo
+    return _aplicar_stock_combos(db, [combo])[0]
 
 
 @combos_router.patch("/{combo_id}/activo", response_model=ProductoOut)
@@ -330,7 +419,7 @@ def cambiar_activo(
     combo.activo = datos.activo
     db.commit()
     db.refresh(combo)
-    return combo
+    return _aplicar_stock_combos(db, [combo])[0]
 
 
 @combos_router.delete("/{combo_id}", status_code=204)

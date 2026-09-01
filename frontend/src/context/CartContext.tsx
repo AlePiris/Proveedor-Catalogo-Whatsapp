@@ -1,13 +1,15 @@
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from "react";
-import type { Producto } from "@/types";
+import type { Eleccion, Producto } from "@/types";
 import { precioEfectivo } from "@/types";
 
-// Un item del carrito guarda el producto entero (para mostrar nombre/precio) y
-// la cantidad. Guardar el producto completo evita volver a pedirlo a la API
-// al renderizar el carrito.
+// Un item del carrito guarda el producto entero (para mostrar nombre/precio),
+// la cantidad y — si es un combo con grupos — las ELECCIONES del cliente
+// (qué producto ocupa cada grupo). Guardar el producto completo evita volver
+// a pedirlo a la API al renderizar el carrito.
 export interface CartItem {
   producto: Producto;
   cantidad: number;
+  elecciones?: Eleccion[] | null;
 }
 
 interface CartState {
@@ -17,7 +19,7 @@ interface CartState {
 // Todas las acciones que modifican el carrito pasan por acá. Esto centraliza la
 // lógica: el componente solo despacha una acción, no toca el estado directamente.
 type Action =
-  | { type: "ADD"; producto: Producto; cantidad?: number }
+  | { type: "ADD"; producto: Producto; cantidad?: number; elecciones?: Eleccion[] | null }
   | { type: "REMOVE"; productoId: number }
   | { type: "SET_CANTIDAD"; productoId: number; cantidad: number }
   | { type: "CLEAR" }
@@ -35,11 +37,17 @@ function reducer(state: CartState, action: Action): CartState {
       if (existing) {
         return {
           items: state.items.map((i) =>
-            i.producto.id === action.producto.id ? { ...i, cantidad: i.cantidad + qty } : i
+            // Mismo producto de nuevo: suma cantidad y PISA las elecciones (la
+            // última selección del selector es la que vale para todas las unidades).
+            i.producto.id === action.producto.id
+              ? { ...i, cantidad: i.cantidad + qty, elecciones: action.elecciones ?? i.elecciones }
+              : i
           ),
         };
       }
-      return { items: [...state.items, { producto: action.producto, cantidad: qty }] };
+      return {
+        items: [...state.items, { producto: action.producto, cantidad: qty, elecciones: action.elecciones }],
+      };
     }
     case "REMOVE":
       return { items: state.items.filter((i) => i.producto.id !== action.productoId) };
@@ -62,7 +70,7 @@ function reducer(state: CartState, action: Action): CartState {
 
 interface CartContextValue {
   items: CartItem[];
-  add: (producto: Producto, cantidad?: number) => void;
+  add: (producto: Producto, cantidad?: number, elecciones?: Eleccion[] | null) => void;
   remove: (productoId: number) => void;
   setCantidad: (productoId: number, cantidad: number) => void;
   clear: () => void;
@@ -100,7 +108,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value: CartContextValue = {
     items: state.items,
-    add: (producto, cantidad) => dispatch({ type: "ADD", producto, cantidad }),
+    add: (producto, cantidad, elecciones) => dispatch({ type: "ADD", producto, cantidad, elecciones }),
     remove: (productoId) => dispatch({ type: "REMOVE", productoId }),
     setCantidad: (productoId, cantidad) => dispatch({ type: "SET_CANTIDAD", productoId, cantidad }),
     clear: () => dispatch({ type: "CLEAR" }),
