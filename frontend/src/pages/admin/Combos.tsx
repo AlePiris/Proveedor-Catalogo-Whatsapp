@@ -181,26 +181,26 @@ export default function Combos() {
       {error && <p className="text-marca">{error}</p>}
 
       {/* -------- Form nuevo combo -------- */}
-      <form onSubmit={crearCombo} className="bg-white border rounded-lg p-4 space-y-3">
+      <form onSubmit={crearCombo} className="bg-negro-panel border border-negro-borde rounded-lg p-4 space-y-3 text-gray-200">
         <h2 className="font-bold">Nuevo combo</h2>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-400">
           El precio es el que paga el cliente por el combo completo (suele ser menor que la suma de sus
           partes sueltas). Sin stock propio: la disponibilidad del combo sale del stock de sus
           componentes en el local, y pedirlo los descuenta automáticamente.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <input className="border rounded px-2 py-1" placeholder="Nombre (ej: Combo Para 6)" required
+          <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" placeholder="Nombre (ej: Combo Para 6)" required
             value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
-          <input className="border rounded px-2 py-1" placeholder="Descripción" value={nuevo.descripcion}
+          <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" placeholder="Descripción" value={nuevo.descripcion}
             onChange={(e) => setNuevo({ ...nuevo, descripcion: e.target.value })} />
-          <input className="border rounded px-2 py-1" placeholder="Precio del combo $" type="number" step="1" required
+          <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" placeholder="Precio del combo $" type="number" step="1" required
             value={nuevo.precio} onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })} />
-          <input className="border rounded px-2 py-1 md:col-span-2" placeholder="Etiqueta (ej: 🍻 Día del Amigo)"
+          <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-500 rounded px-2 py-1 md:col-span-2" placeholder="Etiqueta (ej: 🍻 Día del Amigo)"
             value={nuevo.etiqueta} onChange={(e) => setNuevo({ ...nuevo, etiqueta: e.target.value })} />
         </div>
 
         {/* Componentes del combo: selector (fijo / a elección) + lista de filas */}
-        <div className="border rounded-lg p-3 bg-gray-50 space-y-2">
+        <div className="border border-negro-borde rounded-lg p-3 bg-negro space-y-2">
           <p className="text-sm font-semibold">Componentes (el cliente los verá en la card)</p>
           <SelectorAgregar
             productos={productos}
@@ -213,7 +213,7 @@ export default function Combos() {
             productos={productos}
           />
           {totalSuelto > 0 && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-300">
               Componentes sueltos: <strong>desde ${totalSuelto.toLocaleString("es-AR")}</strong>
               {!isNaN(precioCombo) && precioCombo > 0 && (
                 <> → el cliente ahorra ${(totalSuelto - precioCombo).toLocaleString("es-AR")}</>
@@ -222,7 +222,7 @@ export default function Combos() {
           )}
         </div>
 
-        <button disabled={guardando} className="w-full bg-marca text-white py-2 rounded-lg font-semibold disabled:opacity-50">
+        <button disabled={guardando} className="w-full bg-marca text-black py-2 rounded-lg font-semibold disabled:opacity-50">
           {guardando ? "Guardando…" : "Crear combo"}
         </button>
       </form>
@@ -230,7 +230,7 @@ export default function Combos() {
       {/* -------- Cards de combos existentes -------- */}
       {cargando && <p>Cargando combos…</p>}
       {!cargando && combos.length === 0 && (
-        <p className="text-gray-500">Todavía no hay combos creados.</p>
+        <p className="text-gray-400">Todavía no hay combos creados.</p>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {combos.map((c) => (
@@ -266,7 +266,7 @@ function AdminComboCard({
   }
 
   return (
-    <div className={`border rounded-xl bg-white shadow-sm flex flex-col overflow-hidden ${c.activo ? "" : "opacity-60"}`}>
+    <div className={`border border-negro-borde rounded-xl bg-negro-panel shadow-sm flex flex-col overflow-hidden text-gray-200 ${c.activo ? "" : "opacity-60"}`}>
       <div className="relative">
         {c.imagen_url ? (
           <img src={c.imagen_url} alt={c.nombre} className="w-full h-32 object-cover" />
@@ -299,12 +299,12 @@ function AdminComboCard({
 
       <div className="p-3 flex flex-col gap-2 flex-1">
         <input
-          className="font-bold text-lg border-b focus:outline-none focus:border-marca"
+          className="font-bold text-lg border-b border-negro-borde bg-transparent text-gray-100 focus:outline-none focus:border-marca"
           defaultValue={c.nombre}
           onBlur={(e) => { if (e.target.value.trim() && e.target.value !== c.nombre) editar({ nombre: e.target.value.trim() }); }}
         />
         <input
-          className="text-sm text-gray-600 border-b focus:outline-none focus:border-marca"
+          className="text-sm text-gray-300 border-b border-negro-borde bg-transparent placeholder:text-gray-500 focus:outline-none focus:border-marca"
           defaultValue={c.descripcion ?? ""}
           placeholder="Descripción"
           onBlur={(e) => { if (e.target.value !== (c.descripcion ?? "")) editar({ descripcion: e.target.value || null }); }}
@@ -312,9 +312,9 @@ function AdminComboCard({
 
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="flex items-center gap-1">
-            <label className="text-gray-500">Precio:</label>
+            <label className="text-gray-400">Precio:</label>
             <input
-              type="number" className="border rounded px-2 py-1 w-24"
+              type="number" className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 w-24"
               defaultValue={c.precio}
               onBlur={(e) => {
                 const v = parseFloat(e.target.value);
@@ -325,15 +325,15 @@ function AdminComboCard({
           {/* Disponibilidad CALCULADA por el backend (cuántos combos se pueden
               armar con el stock de los componentes): no es editable. */}
           <div className="flex items-center gap-1">
-            <label className="text-gray-500">Se pueden armar:</label>
-            <span className={`font-semibold ${c.stock > 0 ? "text-green-700" : "text-marca"}`}>
+            <label className="text-gray-400">Se pueden armar:</label>
+            <span className={`font-semibold ${c.stock > 0 ? "text-green-400" : "text-marca"}`}>
               {c.stock}
             </span>
           </div>
           <div className="col-span-2">
-            <label className="text-gray-500 mr-1">Etiqueta:</label>
+            <label className="text-gray-400 mr-1">Etiqueta:</label>
             <input
-              className="border rounded px-2 py-1 w-full"
+              className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 w-full"
               defaultValue={c.etiqueta}
               placeholder='Ej: "🍻 Día del Amigo" (opcional)'
               onBlur={(e) => { if (e.target.value !== c.etiqueta) editar({ etiqueta: e.target.value }); }}
@@ -349,7 +349,7 @@ function AdminComboCard({
               try { await api.admin.setComboActivo(c.id, !c.activo); await onRecargar(); }
               catch (e) { onError((e as Error).message); }
             }}
-            className={`px-2 py-1 rounded text-xs font-semibold ${c.activo ? "bg-green-600 text-white" : "bg-gray-300"}`}
+            className={`px-2 py-1 rounded text-xs font-semibold ${c.activo ? "bg-green-600 text-white" : "bg-negro-borde text-gray-300"}`}
             title="Un combo apagado no se ve en la tienda (útil para sacarlo al día siguiente del festivo)"
           >
             {c.activo ? "✅ Activo" : "🚫 Apagado"}
@@ -362,7 +362,7 @@ function AdminComboCard({
                 await onRecargar();
               } catch (e) { onError((e as Error).message); }
             }}
-            className="px-2 py-1 rounded text-xs font-semibold bg-white border border-marca text-marca"
+            className="px-2 py-1 rounded text-xs font-semibold border border-marca text-marca hover:bg-marca/10"
           >
             Borrar
           </button>
@@ -439,7 +439,7 @@ function EditorComponentes({
     return (
       <div className="text-sm">
         <p className="font-semibold mb-1">Componentes:</p>
-        <ul className="text-gray-600">
+        <ul className="text-gray-300">
           {(c.combo_items ?? []).filter((ci) => !ci.grupo).map((ci) => (
             <li key={ci.producto_id}>• {ci.cantidad}× {ci.nombre}</li>
           ))}
@@ -451,7 +451,7 @@ function EditorComponentes({
           ))}
           {(c.combo_items ?? []).length === 0 && <li className="text-marca">⚠️ Sin componentes</li>}
         </ul>
-        <button onClick={iniciar} className="text-xs underline text-gray-700 hover:text-marca mt-1">
+        <button onClick={iniciar} className="text-xs underline text-gray-200 hover:text-marca mt-1">
           Editar componentes
         </button>
       </div>
@@ -460,7 +460,7 @@ function EditorComponentes({
 
   // Modo edición: mismo selector y lista que el form nuevo, guarda con un PUT.
   return (
-    <div className="border rounded-lg p-2 bg-gray-50 text-sm space-y-2">
+    <div className="border border-negro-borde rounded-lg p-2 bg-negro text-sm space-y-2">
       <SelectorAgregar
         productos={productos}
         onFijo={(prod, cantidad) => {
@@ -478,10 +478,10 @@ function EditorComponentes({
       />
       <ListaFilas filas={filas} setFilas={setFilas} productos={productos} />
       <div className="flex gap-2">
-        <button onClick={() => void guardar()} className="bg-marca text-white px-3 py-1 rounded text-xs font-semibold">
+        <button onClick={() => void guardar()} className="bg-marca text-black px-3 py-1 rounded text-xs font-semibold">
           Guardar componentes
         </button>
-        <button onClick={() => setEditando(false)} className="text-xs underline text-gray-600">
+        <button onClick={() => setEditando(false)} className="text-xs underline text-gray-300">
           Cancelar
         </button>
       </div>
@@ -525,7 +525,7 @@ function SelectorAgregar({
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      <select className="border rounded px-2 py-1" value={selActual}
+      <select className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" value={selActual}
         onChange={(e) => setSelActual(parseInt(e.target.value) || 0)}>
         <option value={0}>Producto…</option>
         {productos.map((p) => (
@@ -536,19 +536,19 @@ function SelectorAgregar({
       </select>
       <input
         type="number" min={1}
-        className={`border rounded px-2 py-1 w-20 ${errorCant ? "border-marca" : ""}`}
+        className={`border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 w-20 ${errorCant ? "border-marca" : ""}`}
         value={cantActual}
         onChange={(e) => { setCantActual(e.target.value); setErrorCant(false); }}
         aria-label="Cantidad del componente"
         placeholder="Cant."
       />
-      <button type="button" onClick={() => agregar("fijo")} className="bg-gray-800 text-white px-3 py-1 rounded text-sm">
+      <button type="button" onClick={() => agregar("fijo")} className="bg-gray-700 text-white hover:bg-gray-600 px-3 py-1 rounded text-sm">
         + Componente
       </button>
       <button
         type="button"
         onClick={() => agregar("grupo")}
-        className="bg-marca text-white px-3 py-1 rounded text-sm"
+        className="bg-marca text-black px-3 py-1 rounded text-sm"
         title='El cliente elegirá entre TODOS los productos de la misma categoría que el producto seleccionado (después podés excluir los que no entren). Ej: 6 empanadas a elección de gustos.'
       >
         + 🧑 Elección del cliente
@@ -598,17 +598,17 @@ function ListaFilas({
     <ul className="text-sm space-y-1">
       {filas.map((f) =>
         f.grupo ? (
-          <li key={f.key} className="border rounded p-2 bg-white">
+          <li key={f.key} className="border border-negro-borde rounded p-2 bg-negro-panel">
             <div className="flex items-center gap-2">
               <span className="flex-1">
                 {f.cantidad || 0}× a elección — <strong>{capitalizar(f.grupo)}</strong>{" "}
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-400">
                   ({f.opciones?.length ?? 0} opciones)
                 </span>
               </span>
               <input
                 type="number" min={1}
-                className={`border rounded px-1 py-0.5 w-14 ${typeof f.cantidad !== "number" || f.cantidad < 1 ? "border-marca" : ""}`}
+                className={`border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-14 ${typeof f.cantidad !== "number" || f.cantidad < 1 ? "border-marca" : ""}`}
                 value={f.cantidad}
                 onChange={(e) => editar(f.key, (x) => ({ ...x, cantidad: leerCantidad(e.target.value) }))}
                 aria-label={`Lugares a repartir de ${f.grupo}`}
@@ -617,7 +617,7 @@ function ListaFilas({
               <button
                 type="button"
                 onClick={() => toggleAbierta(f.key)}
-                className="text-xs underline text-gray-700 hover:text-marca"
+                className="text-xs underline text-gray-200 hover:text-marca"
               >
                 {abiertas.has(f.key) ? "Ocultar opciones" : "Ver opciones"}
               </button>
@@ -634,7 +634,7 @@ function ListaFilas({
                 Todas entran por default; el dueño desmarca las que no. */}
             {abiertas.has(f.key) && (
               <div className="mt-2 border-t pt-2">
-                <p className="text-xs text-gray-500 mb-1">
+                <p className="text-xs text-gray-400 mb-1">
                   El cliente elige entre los marcados (suma {f.cantidad || 0} en total):
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
@@ -679,7 +679,7 @@ function ListaFilas({
             </span>
             <input
               type="number" min={1}
-              className={`border rounded px-1 py-0.5 w-16 ${typeof f.cantidad !== "number" || f.cantidad < 1 ? "border-marca" : ""}`}
+              className={`border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-16 ${typeof f.cantidad !== "number" || f.cantidad < 1 ? "border-marca" : ""}`}
               value={f.cantidad}
               onChange={(e) => editar(f.key, (x) => ({ ...x, cantidad: leerCantidad(e.target.value) }))}
               aria-label={`Cantidad de ${f.nombre}`}

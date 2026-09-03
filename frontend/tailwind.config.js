@@ -6,11 +6,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Una marca simple para la pizzería (rojo tomate + un acento).
+        // Paleta sobre negro (docs/Colores.jpg): amarillo como acento principal,
+        // texto blanco y negro para lo que va ENCIMA del amarillo.
         marca: {
-          DEFAULT: "#c1121f",
-          oscura: "#8b0000",
+          DEFAULT: "#FFD230", // amarillo
+          clara: "#FFE58A",
+          oscura: "#E6B800",
         },
+        negro: {
+          DEFAULT: "#0A0A0A", // fondo general
+          panel: "#171717", // cards y paneles
+          borde: "#2B2B2B",
+        },
+        acento: "#D93A3A", // rojo frutilla (solo errores y avisos puntuales)
       },
     },
   },

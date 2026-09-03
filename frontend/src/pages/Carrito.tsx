@@ -2,38 +2,32 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/api/client";
 import { useCart } from "@/context/CartContext";
-import { precioEfectivo, textoElecciones, type LocalConfig, type TipoEntrega, type TipoPago } from "@/types";
+import { precioEfectivo, textoElecciones, type LocalConfig, type TipoPago } from "@/types";
 import Navbar from "@/components/Navbar";
 
 export default function Carrito() {
   const { items, setCantidad, remove, total, clear } = useCart();
   const navigate = useNavigate();
 
-  // Datos del cliente que pide. El teléfono coincide con el que usará en WhatsApp.
+  // Modelo B2B: el proveedor envía directamente al local que pide.
+  //  - Nombre: contacto de quien pide (o el nombre del local).
+  //  - Dirección: dónde entregar (obligatoria, es lo único que necesita el envío).
+  //  - Teléfono NO se pide: el contacto es WhatsApp y el número ya lo tenemos ahí.
   const [clienteNombre, setClienteNombre] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [notas, setNotas] = useState("");
-  // Entrega: por defecto retira en el local. Si el dueño deshabilitó el delivery
-  // (radio 0 en Ajustes), el selector de delivery queda bloqueado.
-  const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>("takeaway");
   const [direccion, setDireccion] = useState("");
   // Pago: se coordina por WhatsApp (no hay cobro online). Queda registrado
-  // para que el dueño prepare el cambio o mande el link de Mercado Pago.
+  // para que el proveedor prepare el cambio o mande el link de Mercado Pago.
   const [metodoPago, setMetodoPago] = useState<TipoPago>("efectivo");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Config del local: radio de delivery y (si el dueño lo cargó) el número de
-  // WhatsApp que recibe los pedidos. Con esto el dueño controla TODO sin tocar
-  // código ni variables de entorno.
+  // Config del dueño: el número de WhatsApp que recibe los pedidos. Con esto
+  // el dueño controla TODO sin tocar código ni variables de entorno.
   const [config, setConfig] = useState<LocalConfig | null>(null);
   useEffect(() => {
     api.getConfig().then(setConfig).catch(() => setConfig(null));
   }, []);
-
-  // Radio > 0 => delivery habilitado. Mientras no cargue la config (null),
-  // tratamos como "sin delivery" para no prometer algo que no existe.
-  const deliveryHabilitado = (config?.radio_delivery_km ?? 0) > 0;
 
   // Número de WhatsApp: prioriza el de la config del dueño; fallback a la var
   // de entorno (comportamiento original). "0" = inválido => solo se guarda el pedido.
@@ -41,12 +35,12 @@ export default function Carrito() {
 
   async function enviarPedido() {
     setError(null);
-    if (!clienteNombre.trim() || !telefono.trim()) {
-      setError("Completa tu nombre y teléfono.");
+    if (!clienteNombre.trim()) {
+      setError("Completa tu nombre (o el del local).");
       return;
     }
-    if (tipoEntrega === "delivery" && !direccion.trim()) {
-      setError("Si elegís delivery, necesitamos tu dirección.");
+    if (!direccion.trim()) {
+      setError("Necesitamos la dirección del local para enviar el pedido.");
       return;
     }
     if (items.length === 0) return;
@@ -57,9 +51,9 @@ export default function Carrito() {
       //    El backend calcula el total y hace el snapshot de precios.
       const pedido = await api.createPedido({
         cliente_nombre: clienteNombre.trim(),
-        telefono: telefono.trim(),
-        tipo_entrega: tipoEntrega,
-        direccion: tipoEntrega === "delivery" ? direccion.trim() : null,
+        // En el modelo B2B todo pedido es un envío al local que pide.
+        tipo_entrega: "delivery",
+        direccion: direccion.trim(),
         metodo_pago: metodoPago,
         notas: notas.trim() || null,
         items: items.map((i) => ({
@@ -83,15 +77,13 @@ export default function Carrito() {
           );
         })
         .join("\n");
-      const entrega =
-        tipoEntrega === "delivery" ? `🛵 Delivery — ${direccion.trim()}` : "🏪 Take away (retira en el local)";
       const pago = metodoPago === "mercado_pago" ? "📱 Mercado Pago" : "💵 Efectivo";
       // Sin el # de pedido: el ID queda en la base (dashboard), el texto de
       // WhatsApp es solo la info que el dueño necesita para armar el pedido.
       const mensaje =
-        `*Nuevo pedido* 🍕\n` +
-        `Cliente: ${clienteNombre} (${telefono})\n` +
-        `${entrega}\n` +
+        `*Nuevo pedido* 🍫\n` +
+        `Local: ${clienteNombre}\n` +
+        `🛵 Envío a: ${direccion.trim()}\n` +
         `Pago: ${pago}\n\n` +
         `${lineas}\n\n` +
         `*Total: $${pedido.total.toLocaleString("es-AR")}*\n` +
@@ -114,17 +106,17 @@ export default function Carrito() {
   }
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-full bg-negro">
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-6">
         {/* Para volver al catálogo sin retroceder con el navegador. */}
         <Link to="/" className="text-marca hover:underline text-sm">
           ← Volver a la tienda
         </Link>
-        <h1 className="text-2xl font-bold my-4">Tu carrito</h1>
+        <h1 className="text-2xl font-bold text-gray-100 my-4">Tu carrito</h1>
 
         {items.length === 0 ? (
-          <div className="text-center py-10">
+          <div className="text-center py-10 text-gray-200">
             <p className="mb-4">El carrito está vacío.</p>
             <Link to="/" className="text-marca underline">
               Volver a la tienda
@@ -135,7 +127,7 @@ export default function Carrito() {
             {/* Lista de items con controles de cantidad */}
             <div className="space-y-3 mb-6">
               {items.map((i) => (
-                <div key={i.producto.id} className="flex items-center justify-between bg-white border rounded-lg p-3">
+                <div key={i.producto.id} className="flex items-center justify-between bg-negro-panel border border-negro-borde rounded-lg p-3">
                   <div>
                     <p className="font-semibold">{i.producto.nombre}</p>
                     {/* Qué eligió el cliente en los grupos del combo
@@ -145,7 +137,7 @@ export default function Carrito() {
                         {textoElecciones(i.producto, i.elecciones)}
                       </p>
                     )}
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-400">
                       ${precioEfectivo(i.producto).toLocaleString("es-AR")} c/u
                     </p>
                   </div>
@@ -153,14 +145,14 @@ export default function Carrito() {
                     {/* - cantidad + */}
                     <button
                       onClick={() => setCantidad(i.producto.id, i.cantidad - 1)}
-                      className="w-8 h-8 rounded bg-gray-200 hover:bg-gray-300"
+                      className="w-8 h-8 rounded bg-negro-borde hover:bg-gray-600"
                     >
                       −
                     </button>
                     <span className="w-8 text-center">{i.cantidad}</span>
                     <button
                       onClick={() => setCantidad(i.producto.id, i.cantidad + 1)}
-                      className="w-8 h-8 rounded bg-gray-200 hover:bg-gray-300"
+                      className="w-8 h-8 rounded bg-negro-borde hover:bg-gray-600"
                     >
                       +
                     </button>
@@ -178,86 +170,34 @@ export default function Carrito() {
               ))}
             </div>
 
-            {/* Datos del cliente + tipo de entrega */}
-            <div className="bg-white border rounded-lg p-4 space-y-3 mb-4">
-              <h2 className="font-bold">Tus datos</h2>
+            {/* Datos del local que pide (modelo B2B: el proveedor envía al
+                local, no hay retiro ni teléfono — el contacto es WhatsApp). */}
+            <div className="bg-negro-panel border border-negro-borde rounded-lg p-4 space-y-3 mb-4 text-gray-200">
+              <h2 className="font-bold">Datos del local</h2>
               <input
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Nombre y apellido"
+                className="w-full border border-negro-borde rounded-lg px-3 py-2 bg-negro text-gray-100 placeholder:text-gray-500"
+                placeholder="Tu nombre o el del local"
                 value={clienteNombre}
                 onChange={(e) => setClienteNombre(e.target.value)}
               />
               <input
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Teléfono (ej. 11 1234-5678)"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
+                className="w-full border border-negro-borde rounded-lg px-3 py-2 bg-negro text-gray-100 placeholder:text-gray-500"
+                placeholder="Dirección del local (calle, número, ciudad)"
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
               />
-
-              {/* Delivery vs Take away. Si el dueño puso radio 0 en Ajustes,
-                  la opción delivery sale bloqueada. */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">¿Cómo lo querés recibir?</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTipoEntrega("takeaway")}
-                    className={`flex-1 border rounded-lg py-2 text-sm font-semibold transition ${
-                      tipoEntrega === "takeaway"
-                        ? "border-marca bg-marca/5 text-marca"
-                        : "border-gray-300 hover:border-gray-400"
-                    }`}
-                  >
-                    🏪 Take away
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deliveryHabilitado && setTipoEntrega("delivery")}
-                    disabled={!deliveryHabilitado}
-                    title={deliveryHabilitado ? undefined : "La pizzería no ofrece delivery por ahora"}
-                    className={`flex-1 border rounded-lg py-2 text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
-                      tipoEntrega === "delivery"
-                        ? "border-marca bg-marca/5 text-marca"
-                        : "border-gray-300 hover:border-gray-400"
-                    }`}
-                  >
-                    🛵 Delivery
-                  </button>
-                </div>
-                {/* Hint con el radio que configuró el dueño (informativo: el
-                    alcance real lo confirma la pizzería por WhatsApp). */}
-                {deliveryHabilitado ? (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Delivery disponible hasta {config!.radio_delivery_km} km a la redonda del local.
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Por ahora solo tomamos pedidos para retirar en el local.
-                  </p>
-                )}
-              </div>
-
-              {/* Dirección: solo se pide si eligió delivery. */}
-              {tipoEntrega === "delivery" && (
-                <input
-                  className="w-full border rounded-lg px-3 py-2"
-                  placeholder="Dirección de entrega (calle, número, piso/depto)"
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                />
-              )}
 
               {/* Método de pago: informativo (el cobro se coordina por WhatsApp). */}
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">¿Cómo vas a pagar?</p>
+                <p className="text-sm font-semibold text-gray-300 mb-1">¿Con qué vas a pagar?</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setMetodoPago("efectivo")}
                     className={`flex-1 border rounded-lg py-2 text-sm font-semibold transition ${
                       metodoPago === "efectivo"
-                        ? "border-marca bg-marca/5 text-marca"
-                        : "border-gray-300 hover:border-gray-400"
+                        ? "border-marca bg-marca/10 text-marca"
+                        : "border-negro-borde hover:border-gray-500"
                     }`}
                   >
                     💵 Efectivo
@@ -267,8 +207,8 @@ export default function Carrito() {
                     onClick={() => setMetodoPago("mercado_pago")}
                     className={`flex-1 border rounded-lg py-2 text-sm font-semibold transition ${
                       metodoPago === "mercado_pago"
-                        ? "border-marca bg-marca/5 text-marca"
-                        : "border-gray-300 hover:border-gray-400"
+                        ? "border-marca bg-marca/10 text-marca"
+                        : "border-negro-borde hover:border-gray-500"
                     }`}
                   >
                     📱 Mercado Pago
@@ -277,7 +217,7 @@ export default function Carrito() {
               </div>
 
               <textarea
-                className="w-full border rounded-lg px-3 py-2"
+                className="w-full border border-negro-borde rounded-lg px-3 py-2 bg-negro text-gray-100 placeholder:text-gray-500"
                 placeholder="Notas (ej. con servilletas, sin orégano, entregá a las 20:30)"
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
@@ -287,8 +227,8 @@ export default function Carrito() {
 
             {/* Total + enviar */}
             <div className="flex items-center justify-between mb-4">
-              <span className="text-lg">Total:</span>
-              <span className="text-2xl font-bold">${total.toLocaleString("es-AR")}</span>
+              <span className="text-lg text-gray-200">Total:</span>
+              <span className="text-2xl font-bold text-marca">${total.toLocaleString("es-AR")}</span>
             </div>
 
             {error && <p className="text-marca mb-3">{error}</p>}
@@ -296,14 +236,14 @@ export default function Carrito() {
             <button
               onClick={enviarPedido}
               disabled={enviando}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-green-700 disabled:opacity-50"
+              className="w-full bg-marca text-black py-3 rounded-lg font-bold text-lg hover:bg-marca-clara disabled:opacity-50"
             >
               {enviando ? "Enviando…" : "Enviar pedido por WhatsApp"}
             </button>
 
-            <p className="text-xs text-gray-500 mt-3 text-center">
+            <p className="text-xs text-gray-400 mt-3 text-center">
               No se cobra online. Tu pedido se guarda y se abre WhatsApp para que
-              lo confirmes con la pizzería.
+              lo confirmes con el proveedor.
             </p>
           </>
         )}

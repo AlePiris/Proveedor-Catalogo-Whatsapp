@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.database import get_db
-from app.models import Pedido, PedidoItem, Producto, AdminUser, LocalConfig
+from app.models import Pedido, PedidoItem, Producto, AdminUser
 from app.schemas import PedidoCreate, PedidoOut, PedidoUpdate
 
 router = APIRouter(tags=["pedidos"])
@@ -280,10 +280,11 @@ def _ajustar_stock(items_orm: list[PedidoItem], db: Session, reintegrar: bool) -
 
 def _validar_entrega(db: Session, datos: PedidoCreate) -> tuple[str, str | None]:
     """
-    Valida tipo_entrega + direccion contra la config del local:
+    Valida tipo_entrega + direccion:
       - El valor tiene que ser "takeaway" o "delivery" (nada libre).
-      - Delivery solo si el dueño configuró radio > 0 (si es 0, deshabilitado).
-      - Delivery exige dirección (para que al dueño le llegue a domicilio adónde).
+      - "delivery" = envío al local/comercio que pide (modelo B2B): exige
+        dirección a dónde mandar el pedido. Ya no depende del radio de la
+        config: el proveedor define a qué locales llega, no un radio geográfico.
     Devuelve (tipo_entrega, direccion_limpia o None) para guardar en el pedido.
     """
     tipo = (datos.tipo_entrega or "takeaway").strip().lower()
@@ -293,13 +294,9 @@ def _validar_entrega(db: Session, datos: PedidoCreate) -> tuple[str, str | None]
     if tipo == "takeaway":
         return tipo, None
 
-    config = db.query(LocalConfig).filter(LocalConfig.id == 1).first()
-    if config is None or config.radio_delivery_km <= 0:
-        raise HTTPException(status_code=400, detail="La pizzería no tiene delivery disponible")
-
     direccion = (datos.direccion or "").strip()
     if not direccion:
-        raise HTTPException(status_code=400, detail="Delivery requiere una dirección de entrega")
+        raise HTTPException(status_code=400, detail="El envío requiere la dirección del local")
     return tipo, direccion
 
 
@@ -330,7 +327,7 @@ def crear_pedido(datos: PedidoCreate, db: Session = Depends(get_db)):
     _ajustar_stock(items_orm, db, reintegrar=False)
     pedido = Pedido(
         cliente_nombre=datos.cliente_nombre,
-        telefono=datos.telefono,
+        telefono=(datos.telefono or "").strip(),  # opcional: el contacto real es WhatsApp
         tipo_entrega=tipo_entrega,
         direccion=direccion,
         metodo_pago=metodo_pago,

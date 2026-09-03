@@ -66,7 +66,7 @@ export default function GestionPedidos() {
             key={f}
             onClick={() => setFiltro(f)}
             className={`px-3 py-1 rounded text-sm capitalize ${
-              filtro === f ? "bg-marca text-white" : "bg-white border"
+              filtro === f ? "bg-marca text-black" : "bg-negro-panel border border-negro-borde text-gray-200 hover:bg-gray-800"
             }`}
           >
             {f === "todas" ? "Todas" : f}
@@ -74,7 +74,7 @@ export default function GestionPedidos() {
         ))}
       </div>
 
-      {pedidos.length === 0 && <p className="text-gray-500">No hay pedidos en este estado.</p>}
+      {pedidos.length === 0 && <p className="text-gray-400">No hay pedidos en este estado.</p>}
 
       {pedidos.map((p) => (
         <PedidoCard
@@ -209,24 +209,26 @@ function PedidoCard({
   }
 
   const colorEstado =
-    pedido.estado === "confirmada" ? "bg-green-100 text-green-700"
-    : pedido.estado === "cancelada" ? "bg-gray-200 text-gray-600"
-    : "bg-yellow-100 text-yellow-700";
+    pedido.estado === "confirmada" ? "bg-green-500/15 text-green-400"
+    : pedido.estado === "cancelada" ? "bg-gray-700 text-gray-300"
+    : "bg-marca/15 text-marca";
 
   return (
-    <div className="bg-white border rounded-lg p-4">
+    <div className="bg-negro-panel border border-negro-borde rounded-lg p-4">
       <div className="flex justify-between items-start mb-2">
         <div>
           <p className="font-bold">#{pedido.id} — {pedido.cliente_nombre}</p>
-          <p className="text-sm text-gray-500">📞 {pedido.telefono}</p>
+          {/* Los pedidos nuevos no traen teléfono (el contacto es WhatsApp);
+              solo se muestra si el pedido lo tiene (datos viejos o el dueño lo cargó). */}
+          {pedido.telefono && <p className="text-sm text-gray-400">📞 {pedido.telefono}</p>}
           {/* Tipo de entrega: si es delivery, el dueño necesita ver A DONDE ir. */}
           {pedido.tipo_entrega === "delivery" ? (
             <p className="text-sm text-marca font-semibold">🛵 Delivery — {pedido.direccion}</p>
           ) : (
-            <p className="text-sm text-gray-500">🏪 Take away</p>
+            <p className="text-sm text-gray-400">🏪 Take away</p>
           )}
           {/* Método de pago elegido por el cliente (cobro coordinado por WhatsApp). */}
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-400">
             {pedido.metodo_pago === "mercado_pago" ? "📱 Paga con Mercado Pago" : "💵 Paga en efectivo"}
           </p>
         </div>
@@ -265,7 +267,7 @@ function PedidoCard({
                   <input
                     type="number"
                     min={0}
-                    className="border rounded px-1 py-0.5 w-14"
+                    className="border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-14"
                     value={f.cantidad}
                     onChange={(e) => editarFila(f.key, (x) => ({ ...x, cantidad: leerCantidad(e.target.value) }))}
                     aria-label={`Cantidad de ${f.nombre}`}
@@ -284,7 +286,7 @@ function PedidoCard({
                 // Ítem "Otro": nombre y precio editables a mano.
                 <>
                   <input
-                    className="border rounded px-1 py-0.5 flex-1 min-w-0"
+                    className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-500 rounded px-1 py-0.5 flex-1 min-w-0"
                     placeholder='Nombre del extra (ej. "bacon extra")'
                     value={f.nombre}
                     onChange={(e) => editarFila(f.key, (x) => ({ ...x, nombre: e.target.value }))}
@@ -295,7 +297,7 @@ function PedidoCard({
                       type="number"
                       min={0}
                       step="1"
-                      className="border rounded px-1 py-0.5 w-20 pl-4"
+                      className="border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-20 pl-4"
                       value={f.precio}
                       onChange={(e) => editarFila(f.key, (x) => ({ ...x, precio: parseFloat(e.target.value) || 0 }))}
                       aria-label="Precio del extra"
@@ -304,7 +306,7 @@ function PedidoCard({
                   <input
                     type="number"
                     min={0}
-                    className="border rounded px-1 py-0.5 w-14"
+                    className="border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-14"
                     value={f.cantidad}
                     onChange={(e) => editarFila(f.key, (x) => ({ ...x, cantidad: leerCantidad(e.target.value) }))}
                     aria-label="Cantidad del extra"
@@ -327,7 +329,7 @@ function PedidoCard({
           <li>
             <button
               onClick={agregarOtro}
-              className="text-sm text-blue-600 hover:underline font-semibold"
+              className="text-sm text-blue-400 hover:underline font-semibold"
             >
               + Agregar "Otro"
             </button>
@@ -354,10 +356,10 @@ function PedidoCard({
       {editando && errorEdicion && <p className="text-marca text-sm mb-2">{errorEdicion}</p>}
 
       {pedido.notas && (
-        <p className="text-sm text-gray-600 italic mb-2">Notas: {pedido.notas}</p>
+        <p className="text-sm text-gray-300 italic mb-2">Notas: {pedido.notas}</p>
       )}
 
-      <div className="flex justify-between items-center pt-2 border-t">
+      <div className="flex justify-between items-center pt-2 border-t border-negro-borde">
         {/* En edición mostramos el total "en vivo" del editor (el definitivo
             lo recalcula el backend al guardar). */}
         <span className="font-bold">
@@ -375,7 +377,7 @@ function PedidoCard({
             <select
               value={metodoPagoEdit}
               onChange={(e) => setMetodoPagoEdit(e.target.value as PedidoOut["metodo_pago"])}
-              className="border rounded px-2 py-1 text-sm"
+              className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 text-sm"
               aria-label="Método de pago"
             >
               <option value="efectivo">💵 Efectivo</option>
@@ -383,7 +385,7 @@ function PedidoCard({
             </select>
             <button
               onClick={guardarCambios}
-              className="bg-marca text-white px-3 py-1 rounded text-sm"
+              className="bg-marca text-black px-3 py-1 rounded text-sm"
             >
               Guardar cambios
             </button>
@@ -392,9 +394,9 @@ function PedidoCard({
           <div className="flex gap-2">
             {pedido.estado === "pendiente" && (
               <>
-                <button onClick={onEditar} className="text-sm text-blue-600 hover:underline">Editar</button>
-                <button onClick={() => onConfirmar(pedido)} className="text-sm text-green-600 hover:underline font-semibold">Confirmar</button>
-                <button onClick={() => onCancelar(pedido)} className="text-sm text-gray-500 hover:underline">Cancelar</button>
+                <button onClick={onEditar} className="text-sm text-blue-400 hover:underline">Editar</button>
+                <button onClick={() => onConfirmar(pedido)} className="text-sm text-green-400 hover:underline font-semibold">Confirmar</button>
+                <button onClick={() => onCancelar(pedido)} className="text-sm text-gray-400 hover:underline">Cancelar</button>
               </>
             )}
           </div>

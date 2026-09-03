@@ -19,23 +19,23 @@ export default function Contacto() {
   }, []);
 
   return (
-    <div className="min-h-full bg-gray-50 flex flex-col">
+    <div className="min-h-full bg-negro flex flex-col">
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 py-10 flex-1 w-full">
-        <h1 className="text-2xl font-bold mb-6">Contacto</h1>
+        <h1 className="text-2xl font-bold text-gray-100 mb-6">Contacto</h1>
 
         {error && <p className="text-marca">Error: {error}</p>}
-        {!config && !error && <p>Cargando…</p>}
+        {!config && !error && <p className="text-gray-300">Cargando…</p>}
 
         {config && (
-          <div className="bg-white border rounded-xl shadow-sm p-6 space-y-4">
+          <div className="bg-negro-panel border border-negro-borde rounded-xl shadow-sm p-6 space-y-4">
             <div>
-              <h2 className="text-xl font-bold text-marca">🍕 {config.nombre}</h2>
-              {config.descripcion && <p className="text-gray-600 mt-1">{config.descripcion}</p>}
+              <h2 className="text-xl font-bold text-marca">🍫 {config.nombre}</h2>
+              {config.descripcion && <p className="text-gray-400 mt-1">{config.descripcion}</p>}
             </div>
 
-            <ul className="space-y-3 text-gray-700">
+            <ul className="space-y-3 text-gray-200">
               {config.direccion && (
                 <li className="flex items-start gap-2">
                   <span aria-hidden>📍</span>
@@ -76,14 +76,14 @@ export default function Contacto() {
             </ul>
 
             {/* Radio de delivery configurado por el dueño (informativo). */}
-            <div className="border-t pt-4">
+            <div className="border-t border-negro-borde pt-4">
               {config.radio_delivery_km > 0 ? (
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-gray-300">
                   🛵 <strong>Hacemos delivery hasta {config.radio_delivery_km} km</strong> a la
                   redonda del local. El alcance exacto lo confirmamos por WhatsApp.
                 </p>
               ) : (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-400">
                   Por ahora no ofrecemos delivery. Podés retirar tu pedido en el local.
                 </p>
               )}

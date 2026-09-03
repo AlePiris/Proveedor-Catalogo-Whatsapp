@@ -73,17 +73,17 @@ export default function Tienda() {
   ];
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-full bg-negro">
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-4">Nuestros productos</h1>
+        <h1 className="text-2xl font-bold text-gray-100 mb-4">Nuestros productos</h1>
 
         {/* Carrusel de promos: gira solo entre combos y ofertas. Al tocarlo
             lleva a la sección correspondiente de la página. */}
         <CarruselPromos slides={slides} />
 
-        {cargando && <p>Cargando…</p>}
+        {cargando && <p className="text-gray-300">Cargando…</p>}
         {error && <p className="text-marca">Error: {error}</p>}
 
         {/* Flex: en desktop los productos a la izquierda y el panel del pedido
@@ -99,7 +99,7 @@ export default function Tienda() {
             {combos.length > 0 && (
               <section id="combos" className="mb-8 scroll-mt-20">
                 <h2 className="text-xl font-bold text-marca mb-3">🎉 Combos y especiales</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {combos.map((p) => (
                     <ProductoCard key={p.id} producto={p} />
                   ))}
@@ -112,7 +112,7 @@ export default function Tienda() {
             {ofertas.length > 0 && (
               <section id="ofertas" className="mb-8 scroll-mt-20">
                 <h2 className="text-xl font-bold text-marca mb-3">🔥 Ofertas</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {ofertas.map((p) => (
                     <ProductoCard key={p.id} producto={p} />
                   ))}
@@ -120,13 +120,13 @@ export default function Tienda() {
               </section>
             )}
 
-            {/* Resto del catálogo: UNA SECCIÓN POR CATEGORÍA (Pizzas,
-                Empanadas, Bebidas, Postres...), en el orden que definió el
+            {/* Resto del catálogo: UNA SECCIÓN POR CATEGORÍA (Barritas,
+                Proteicas, Zero, Bebidas...), en el orden que definió el
                 dueño. Solo se muestran las categorías con productos. */}
             {secciones.map((sec) => (
               <section key={sec.nombre} id={`cat-${sec.nombre}`} className="mb-8 scroll-mt-20">
                 <h2 className="text-xl font-bold text-marca mb-3">{capitalizar(sec.nombre)}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {sec.productos.map((p) => (
                     <ProductoCard key={p.id} producto={p} />
                   ))}
@@ -135,7 +135,7 @@ export default function Tienda() {
             ))}
 
             {!cargando && !error && productos.length === 0 && (
-              <p>No hay productos cargados todavía.</p>
+              <p className="text-gray-300">No hay productos cargados todavía.</p>
             )}
           </div>
 
@@ -144,7 +144,7 @@ export default function Tienda() {
               ref={panelRef}
               className="mt-8 lg:mt-0 lg:w-80 lg:shrink-0 lg:sticky lg:top-20"
             >
-              <div className="bg-white border rounded-xl shadow-sm p-4">
+              <div className="bg-negro-panel border border-negro-borde rounded-xl shadow-sm p-4 text-gray-200">
                 <h2 className="font-bold text-lg mb-3 flex items-center justify-between">
                   <span>🛒 Tu pedido</span>
                   <span className="text-sm font-semibold bg-marca text-white rounded-full px-2 py-0.5">
@@ -152,19 +152,19 @@ export default function Tienda() {
                   </span>
                 </h2>
 
-                <ul className="divide-y divide-gray-100">
+                <ul className="divide-y divide-negro-borde">
                   {items.map((i) => (
                     <li key={i.producto.id} className="py-2 flex items-center gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{i.producto.nombre}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-400">
                           ${precioEfectivo(i.producto).toLocaleString("es-AR")} c/u
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setCantidad(i.producto.id, i.cantidad - 1)}
-                          className="w-7 h-7 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                          className="w-7 h-7 rounded bg-negro-borde hover:bg-gray-600 text-sm"
                           aria-label={`Quitar un ${i.producto.nombre}`}
                         >
                           −
@@ -172,7 +172,7 @@ export default function Tienda() {
                         <span className="w-6 text-center text-sm">{i.cantidad}</span>
                         <button
                           onClick={() => setCantidad(i.producto.id, i.cantidad + 1)}
-                          className="w-7 h-7 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                          className="w-7 h-7 rounded bg-negro-borde hover:bg-gray-600 text-sm"
                           aria-label={`Agregar un ${i.producto.nombre}`}
                         >
                           +
@@ -185,14 +185,14 @@ export default function Tienda() {
                   ))}
                 </ul>
 
-                <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-negro-borde">
                   <span>Total:</span>
-                  <span className="text-xl font-bold">${total.toLocaleString("es-AR")}</span>
+                  <span className="text-xl font-bold text-marca">${total.toLocaleString("es-AR")}</span>
                 </div>
 
                 <Link
                   to="/carrito"
-                  className="mt-3 block text-center bg-marca text-white py-2 rounded-lg font-semibold hover:bg-marca-oscura transition"
+                  className="mt-3 block text-center bg-marca text-black py-2 rounded-lg font-semibold hover:bg-marca-clara transition"
                 >
                   Confirmar pedido
                 </Link>
@@ -215,7 +215,7 @@ export default function Tienda() {
   );
 }
 
-// "pizza" -> "Pizza": título lindo para la sección sin guardar un "nombre
+// "barritas" -> "Barritas": título lindo para la sección sin guardar un "nombre
 // de display" aparte en la DB (la categoría es un string único).
 function capitalizar(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -264,7 +264,7 @@ function CarruselPromos({
       <div
         key={idx} // remount por slide = la animación entra en cada giro
         onClick={ir}
-        className="cursor-pointer rounded-2xl bg-marca text-white overflow-hidden flex items-center gap-4 p-4 sm:p-6 carrusel-in"
+        className="cursor-pointer rounded-2xl bg-marca text-black overflow-hidden flex items-center gap-4 p-4 sm:p-6 carrusel-in"
       >
         {p.imagen_url ? (
           <img
@@ -273,17 +273,17 @@ function CarruselPromos({
             className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl object-cover shrink-0"
           />
         ) : (
-          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-white/20 flex items-center justify-center text-5xl shrink-0">
+          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-black/20 flex items-center justify-center text-5xl shrink-0">
             {tipo === "combo" ? "🎉" : "🔥"}
           </div>
         )}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1 mb-1">
-            <span className="bg-white text-marca text-xs font-bold px-2 py-0.5 rounded">
+            <span className="bg-black text-marca text-xs font-bold px-2 py-0.5 rounded">
               {tipo === "combo" ? "COMBO" : "OFERTA"}
             </span>
             {p.etiqueta && (
-              <span className="bg-white/20 text-xs font-semibold px-2 py-0.5 rounded">
+              <span className="bg-black/25 text-xs font-semibold px-2 py-0.5 rounded">
                 {p.etiqueta}
               </span>
             )}
@@ -292,12 +292,12 @@ function CarruselPromos({
           <p className="text-sm sm:text-base">
             ${precioEfectivo(p).toLocaleString("es-AR")}
             {tipo === "oferta" && (
-              <span className="line-through ml-2 text-white/60">
+              <span className="line-through ml-2 text-black/50">
                 ${p.precio.toLocaleString("es-AR")}
               </span>
             )}
           </p>
-          <p className="text-xs text-white/70 mt-1">
+          <p className="text-xs text-black/70 mt-1">
             Tocá para ver en {tipo === "combo" ? "Combos y especiales" : "Ofertas"} →
           </p>
         </div>
@@ -307,14 +307,14 @@ function CarruselPromos({
       <button
         onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + slides.length) % slides.length); }}
         aria-label="Promo anterior"
-        className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-gray-800 items-center justify-center shadow"
+        className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-negro text-white border border-gray-500 hover:bg-gray-800 items-center justify-center shadow"
       >
         ‹
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % slides.length); }}
         aria-label="Promo siguiente"
-        className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-gray-800 items-center justify-center shadow"
+        className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-negro text-white border border-gray-500 hover:bg-gray-800 items-center justify-center shadow"
       >
         ›
       </button>
@@ -327,7 +327,7 @@ function CarruselPromos({
             onClick={(e) => { e.stopPropagation(); setIdx(i); }}
             aria-label={`Ir a la promo ${i + 1}`}
             className={`h-2 rounded-full transition-all ${
-              i === idx ? "w-5 bg-marca" : "w-2 bg-gray-300 hover:bg-gray-400"
+              i === idx ? "w-5 bg-marca" : "w-2 bg-gray-600 hover:bg-gray-500"
             }`}
           />
         ))}

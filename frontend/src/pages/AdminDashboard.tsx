@@ -24,8 +24,8 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-full bg-gray-50">
-      <div className="bg-marca text-white">
+    <div className="min-h-full bg-negro">
+      <div className="bg-negro border-b border-negro-borde text-marca">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-bold">Dashboard del dueño</h1>
           <button onClick={logout} className="text-sm hover:underline">
@@ -79,7 +79,7 @@ function TabButton({
     <button
       onClick={onClick}
       className={`px-4 py-2 rounded-lg font-semibold transition ${
-        active ? "bg-marca text-white" : "bg-white border hover:bg-gray-100"
+        active ? "bg-marca text-black" : "bg-negro-panel border border-negro-borde text-gray-200 hover:bg-gray-800"
       }`}
     >
       {children}

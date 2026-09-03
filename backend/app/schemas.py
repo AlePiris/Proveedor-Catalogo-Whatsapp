@@ -257,9 +257,11 @@ class PedidoItemOut(BaseModel):
 class PedidoCreate(BaseModel):
     """El cliente envía esto al finalizar el carrito."""
     cliente_nombre: str
-    telefono: str
-    # "takeaway" (retira) o "delivery". El router valida coherencia con la
-    # config del local (si el radio es 0, el delivery está deshabilitado).
+    # Opcional: en el modelo B2B el contacto es por WhatsApp (el número ya lo
+    # tenemos ahí). Se guarda vacío si el cliente no lo informa.
+    telefono: str = ""
+    # "takeaway" (retira) o "delivery" (envío al local del cliente, el modelo
+    # actual). El router exige dirección si es delivery.
     tipo_entrega: str = "takeaway"
     # Solo para delivery (el router exige dirección si el cliente lo pide a casa).
     direccion: Optional[str] = None

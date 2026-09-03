@@ -17,10 +17,10 @@ export default function Footer() {
   if (!config) return null;
 
   return (
-    <footer className="border-t bg-white mt-12">
-      <div className="max-w-7xl mx-auto px-4 py-6 text-sm text-gray-600 grid gap-4 sm:grid-cols-3">
+    <footer className="border-t border-negro-borde bg-negro mt-12">
+      <div className="max-w-7xl mx-auto px-4 py-6 text-sm text-gray-400 grid gap-4 sm:grid-cols-3">
         <div>
-          <p className="font-bold text-gray-800 mb-1">🍕 {config.nombre}</p>
+          <p className="font-bold text-marca mb-1">🍫 {config.nombre}</p>
           {config.descripcion && <p className="text-xs">{config.descripcion}</p>}
         </div>
         <div className="space-y-1">

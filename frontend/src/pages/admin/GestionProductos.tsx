@@ -15,7 +15,7 @@ export default function GestionProductos() {
     descripcion: "",
     precio: "",
     stock: "",
-    categoria: "pizza",
+    categoria: "barritas",
     precio_oferta: "",
   });
   const [nuevaImagen, setNuevaImagen] = useState<File | null>(null);
@@ -175,29 +175,29 @@ export default function GestionProductos() {
       {error && <p className="text-marca">{error}</p>}
 
       {/* Formulario nuevo producto */}
-      <form onSubmit={crear} className="bg-white border rounded-lg p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+      <form onSubmit={crear} className="bg-negro-panel border border-negro-borde rounded-lg p-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-gray-200">
         <h2 className="col-span-full font-bold">Nuevo producto</h2>
-        <input className="border rounded px-2 py-1" placeholder="Nombre" required value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
-        <input className="border rounded px-2 py-1" placeholder="Descripción" value={nuevo.descripcion} onChange={(e) => setNuevo({ ...nuevo, descripcion: e.target.value })} />
-        <select className="border rounded px-2 py-1" value={nuevo.categoria} onChange={(e) => setNuevo({ ...nuevo, categoria: e.target.value })}>
+        <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" placeholder="Nombre" required value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
+        <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" placeholder="Descripción" value={nuevo.descripcion} onChange={(e) => setNuevo({ ...nuevo, descripcion: e.target.value })} />
+        <select className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" value={nuevo.categoria} onChange={(e) => setNuevo({ ...nuevo, categoria: e.target.value })}>
           {categorias.map((c) => (
             <option key={c.id} value={c.nombre}>{c.nombre}</option>
           ))}
         </select>
-        <input className="border rounded px-2 py-1" type="number" placeholder="Precio $" required value={nuevo.precio} onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })} />
-        <input className="border rounded px-2 py-1" type="number" placeholder="Precio oferta $" value={nuevo.precio_oferta} onChange={(e) => setNuevo({ ...nuevo, precio_oferta: e.target.value })} />
-        <input className="border rounded px-2 py-1" type="number" placeholder="Stock" value={nuevo.stock} onChange={(e) => setNuevo({ ...nuevo, stock: e.target.value })} />
+        <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" type="number" placeholder="Precio $" required value={nuevo.precio} onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })} />
+        <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" type="number" placeholder="Precio oferta $" value={nuevo.precio_oferta} onChange={(e) => setNuevo({ ...nuevo, precio_oferta: e.target.value })} />
+        <input className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-400 rounded px-2 py-1" type="number" placeholder="Stock" value={nuevo.stock} onChange={(e) => setNuevo({ ...nuevo, stock: e.target.value })} />
         {/* Imagen: input de archivo. Se sube después de crear el producto. */}
         <div className="col-span-full">
-          <label className="text-sm text-gray-600 mr-2">Imagen:</label>
+          <label className="text-sm text-gray-300 mr-2">Imagen:</label>
           <input
             type="file"
             accept="image/*"
             onChange={(e) => setNuevaImagen(e.target.files?.[0] ?? null)}
           />
-          {nuevaImagen && <span className="text-xs text-gray-500 ml-2">→ {nuevaImagen.name}</span>}
+          {nuevaImagen && <span className="text-xs text-gray-400 ml-2">→ {nuevaImagen.name}</span>}
         </div>
-        <button disabled={guardando} className="col-span-full bg-marca text-white py-2 rounded font-semibold disabled:opacity-50">
+        <button disabled={guardando} className="col-span-full bg-marca text-black py-2 rounded font-semibold disabled:opacity-50">
           {guardando ? "Guardando…" : "Agregar producto"}
         </button>
       </form>
@@ -206,25 +206,25 @@ export default function GestionProductos() {
           categoría, en este orden). Renombrar actualiza los productos que la
           usan; borrar solo se puede si no tiene productos. "combo" es un
           nombre reservado del backend (los combos viven en su propia tab). */}
-      <div className="bg-white border rounded-lg p-4">
-        <h2 className="font-bold mb-2">Categorías del menú</h2>
+      <div className="bg-negro-panel border border-negro-borde rounded-lg p-4">
+        <h2 className="font-bold mb-2 text-gray-100">Categorías del menú</h2>
         <div className="flex flex-wrap gap-2 mb-3">
           {categorias.map((c) => {
             const cantidad = productos.filter((p) => p.categoria === c.nombre).length;
             return (
-              <span key={c.id} className="inline-flex items-center gap-1 bg-gray-100 rounded-full pl-3 pr-1 py-1 text-sm">
+              <span key={c.id} className="inline-flex items-center gap-1 bg-gray-800 text-gray-200 rounded-full pl-3 pr-1 py-1 text-sm">
                 {c.nombre}
-                <span className="text-xs text-gray-500">({cantidad})</span>
+                <span className="text-xs text-gray-400">({cantidad})</span>
                 <button
                   onClick={() => renombrarCategoria(c)}
-                  className="w-5 h-5 rounded-full hover:bg-gray-200"
+                  className="w-5 h-5 rounded-full hover:bg-gray-700"
                   title="Renombrar"
                 >
                   ✎
                 </button>
                 <button
                   onClick={() => borrarCategoria(c)}
-                  className="w-5 h-5 rounded-full hover:bg-gray-200"
+                  className="w-5 h-5 rounded-full hover:bg-gray-700"
                   title="Borrar (solo si no tiene productos)"
                 >
                   ✕
@@ -233,25 +233,25 @@ export default function GestionProductos() {
             );
           })}
           {categorias.length === 0 && (
-            <p className="text-sm text-gray-500">No hay categorías. Agregá una acá abajo.</p>
+            <p className="text-sm text-gray-400">No hay categorías. Agregá una acá abajo.</p>
           )}
         </div>
         <form onSubmit={crearCategoria} className="flex gap-2">
           <input
-            className="border rounded px-2 py-1 flex-1 max-w-xs"
-            placeholder="Nueva categoría (ej: Pizzas)"
+            className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-500 rounded px-2 py-1 flex-1 max-w-xs"
+            placeholder="Nueva categoría (ej: Barritas clásicas)"
             value={nuevaCat}
             onChange={(e) => setNuevaCat(e.target.value)}
           />
-          <button className="bg-marca text-white px-3 py-1 rounded text-sm font-semibold">
+          <button className="bg-marca text-black px-3 py-1 rounded text-sm font-semibold">
             Agregar categoría
           </button>
         </form>
       </div>
 
       {/* Cards de productos (vista del dueño) */}
-      {cargando && <p>Cargando productos…</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {cargando && <p className="text-gray-300">Cargando productos…</p>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {productos.map((p) => (
           <AdminProductoCard
             key={p.id}
@@ -304,13 +304,13 @@ function AdminProductoCard({
     : [...categorias, { id: -1, nombre: p.categoria, orden: 0 }];
 
   return (
-    <div className={`border rounded-xl bg-white shadow-sm flex flex-col overflow-hidden ${oculto ? "opacity-60" : ""}`}>
+    <div className={`border border-negro-borde rounded-xl bg-negro-panel shadow-sm flex flex-col overflow-hidden text-gray-200 ${oculto ? "opacity-60" : ""}`}>
       {/* Imagen + botón cambiar */}
       <div className="relative">
         {p.imagen_url ? (
-          <img src={p.imagen_url} alt={p.nombre} className="w-full h-32 object-cover" />
+          <img src={p.imagen_url} alt={p.nombre} className="w-full aspect-square object-cover" />
         ) : (
-          <div className="w-full h-32 bg-gray-100 flex items-center justify-center text-4xl">🍕</div>
+          <div className="w-full aspect-square bg-negro flex items-center justify-center text-4xl">🍫</div>
         )}
         <button
           onClick={() => fileRef.current?.click()}
@@ -333,12 +333,12 @@ function AdminProductoCard({
       <div className="p-3 flex flex-col gap-2">
         {/* Nombre editable */}
         <input
-          className="font-bold text-lg border-b focus:outline-none focus:border-marca"
+          className="font-bold text-lg border-b border-negro-borde bg-transparent text-gray-100 focus:outline-none focus:border-marca"
           defaultValue={p.nombre}
           onBlur={(e) => { if (e.target.value !== p.nombre) onEditar(p.id, { nombre: e.target.value }); }}
         />
         <input
-          className="text-sm text-gray-600 border-b focus:outline-none focus:border-marca"
+          className="text-sm text-gray-300 border-b border-negro-borde bg-transparent placeholder:text-gray-500 focus:outline-none focus:border-marca"
           defaultValue={p.descripcion ?? ""}
           placeholder="Descripción"
           onBlur={(e) => { if (e.target.value !== (p.descripcion ?? "")) onEditar(p.id, { descripcion: e.target.value }); }}
@@ -346,9 +346,9 @@ function AdminProductoCard({
 
         {/* Precio + stock (el dueño SÍ ve el stock) */}
         <div className="flex gap-2 items-center text-sm">
-          <label className="text-gray-500">Categoría:</label>
+          <label className="text-gray-400">Categoría:</label>
           <select
-            className="border rounded px-2 py-1 flex-1"
+            className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 flex-1"
             value={p.categoria}
             onChange={(e) => { if (e.target.value !== p.categoria) onEditar(p.id, { categoria: e.target.value }); }}
           >
@@ -358,49 +358,49 @@ function AdminProductoCard({
           </select>
         </div>
         <div className="flex gap-2 items-center text-sm">
-          <label className="text-gray-500">Precio:</label>
+          <label className="text-gray-400">Precio:</label>
           <input
             type="number"
-            className="border rounded px-2 py-1 w-24"
+            className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 w-24"
             defaultValue={p.precio}
             onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v !== p.precio) onEditar(p.id, { precio: v }); }}
           />
         </div>
         <div className="flex gap-2 items-center text-sm">
-          <label className="text-gray-500">Stock:</label>
+          <label className="text-gray-400">Stock:</label>
           {/* Combos: sin stock propio. El backend devuelve en `stock` cuántos
               se pueden armar con los componentes del local (no editable). */}
           {esCombo(p) ? (
-            <span className={`font-semibold ${p.stock > 0 ? "text-green-700" : "text-marca"}`}>
+            <span className={`font-semibold ${p.stock > 0 ? "text-green-400" : "text-marca"}`}>
               {p.stock} (según componentes)
             </span>
           ) : (
             <input
               type="number"
-              className="border rounded px-2 py-1 w-24"
+              className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1 w-24"
               defaultValue={p.stock}
               onBlur={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== p.stock) onEditar(p.id, { stock: v, disponible: v > 0 }); }}
             />
           )}
-          {oculto && <span className="text-xs text-gray-500">(oculto al cliente)</span>}
+          {oculto && <span className="text-xs text-gray-400">(oculto al cliente)</span>}
         </div>
 
         {/* Botones: oferta / alarma / borrar */}
         <div className="flex flex-wrap gap-2 mt-1">
           <button
             onClick={() => onToggleOferta(p)}
-            className={`px-2 py-1 rounded text-xs font-semibold ${p.en_oferta ? "bg-marca text-white" : "bg-gray-200"}`}
+            className={`px-2 py-1 rounded text-xs font-semibold ${p.en_oferta ? "bg-marca text-black" : "bg-negro-borde text-gray-300"}`}
           >
             {p.en_oferta ? `Oferta $${p.precio_oferta}` : "No en oferta"}
           </button>
           <button
             onClick={() => onToggleAlarma(p)}
-            className={`px-2 py-1 rounded text-xs font-semibold ${p.mostrar_sin_stock ? "bg-gray-700 text-white" : "bg-gray-200"}`}
+            className={`px-2 py-1 rounded text-xs font-semibold ${p.mostrar_sin_stock ? "bg-gray-700 text-white" : "bg-negro-borde text-gray-300"}`}
             title="Si está activa (gris), el producto se oculta al cliente cuando stock=0. Al desactivarla (oscuro), se muestra marcado 'Sin stock'."
           >
             {p.mostrar_sin_stock ? "Alarma OFF" : "Alarma ON"}
           </button>
-          <button onClick={() => onBorrar(p)} className="px-2 py-1 rounded text-xs font-semibold bg-white border border-marca text-marca">
+          <button onClick={() => onBorrar(p)} className="px-2 py-1 rounded text-xs font-semibold border border-marca text-marca hover:bg-marca/10">
             Borrar
           </button>
         </div>

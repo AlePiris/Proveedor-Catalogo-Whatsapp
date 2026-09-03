@@ -121,9 +121,10 @@ export type TipoPago = "efectivo" | "mercado_pago";
 
 export interface PedidoCreate {
   cliente_nombre: string;
-  telefono: string;
+  // Opcional: el contacto real es WhatsApp (el número ya lo tenemos ahí).
+  telefono?: string;
   tipo_entrega: TipoEntrega;
-  direccion?: string | null; // solo para delivery
+  direccion?: string | null; // para "delivery": dirección del local que pide
   metodo_pago: TipoPago;
   notas?: string | null;
   items: PedidoItemInput[];

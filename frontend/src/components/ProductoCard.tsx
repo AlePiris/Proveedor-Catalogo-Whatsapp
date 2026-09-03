@@ -79,41 +79,43 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
   }
 
   return (
-    <div className="relative border rounded-xl bg-white shadow-sm flex flex-col overflow-hidden">
+    <div className="relative border border-negro-borde rounded-xl bg-negro-panel shadow-sm flex flex-col overflow-hidden">
       {/* Badge con la cantidad en carrito: solo si el producto ya fue agregado. */}
       {cantidad > 0 && (
         <span className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-marca text-white text-xs font-bold flex items-center justify-center shadow-md">
           {cantidad}
         </span>
       )}
-      {/* Imagen (si tiene). Si no, un placeholder. */}
+      {/* Imagen (si tiene). Si no, un placeholder. aspect-square: la foto
+          mantiene proporción en cualquier ancho de card, sin recortes raros
+          (las fotos de packaging son verticales y con h-40 fijo quedaban mal). */}
       {producto.imagen_url ? (
         <img
           src={producto.imagen_url}
           alt={producto.nombre}
-          className="w-full h-40 object-cover"
+          className="w-full aspect-square object-cover"
         />
       ) : (
-        <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-5xl">
-          🍕
+        <div className="w-full aspect-square bg-negro flex items-center justify-center text-5xl">
+          🍫
         </div>
       )}
 
-      <div className="p-4 flex flex-col flex-1">
+      <div className="p-3 flex flex-col flex-1 gap-0.5">
         {/* Badge de combo: más vistoso que una simple oferta, y con etiqueta
             libre del dueño (ej: "🍻 Día del Amigo"). */}
         {esCombo(producto) && (
-          <span className="self-start bg-marca text-white text-xs font-bold px-2 py-0.5 rounded mb-2">
+          <span className="self-start bg-marca text-black text-xs font-bold px-2 py-0.5 rounded mb-2">
             COMBO
           </span>
         )}
         {producto.etiqueta && (
-          <span className="self-start bg-gray-100 border border-marca/30 text-marca text-xs font-bold px-2 py-0.5 rounded mb-2">
+          <span className="self-start border border-marca/40 text-marca text-xs font-bold px-2 py-0.5 rounded mb-2">
             {producto.etiqueta}
           </span>
         )}
         {!esCombo(producto) && producto.en_oferta && (
-          <span className="self-start bg-marca text-white text-xs font-bold px-2 py-0.5 rounded mb-2">
+          <span className="self-start bg-marca text-black text-xs font-bold px-2 py-0.5 rounded mb-2">
             OFERTA
           </span>
         )}
@@ -123,20 +125,20 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
           </span>
         )}
 
-        <h3 className="font-bold text-lg">{producto.nombre}</h3>
+        <h3 className="font-bold text-base text-gray-100">{producto.nombre}</h3>
 
         {/* Combo: mostramos SUS COMPONENTES (el "6× Empanada + 2× Coca").
             El precio del combo manda; los precios unitarios son descriptivos.
             Las opciones de un mismo grupo se muestran como alternativas
             ("Bebida a elección: Coca / Agua / Fanta"), no como suma. */}
         {esCombo(producto) && (producto.combo_items?.length ?? 0) > 0 && (
-          <ul className="text-sm text-gray-600 my-1 space-y-0.5">
+          <ul className="text-sm text-gray-300 my-1 space-y-0.5">
             {(producto.combo_items ?? [])
               .filter((ci) => !ci.grupo)
               .map((ci) => (
                 <li key={ci.producto_id}>
                   • {ci.cantidad}× {ci.nombre}
-                  <span className="text-gray-400 ml-1">
+                  <span className="text-gray-500 ml-1">
                     (${ci.precio_unitario.toLocaleString("es-AR")} c/u)
                   </span>
                 </li>
@@ -163,13 +165,13 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
                 const actual = Number(Object.keys(elecciones[grupo] ?? {})[0]);
                 return (
                   <label key={grupo} className="block">
-                    <span className="text-xs font-semibold text-gray-700">
+                    <span className="text-xs font-semibold text-gray-300">
                       Elegí tu {grupo.toLowerCase()}:
                     </span>
                     <select
                       value={actual}
                       onChange={(e) => elegirUnidad(grupo, Number(e.target.value))}
-                      className="w-full mt-0.5 border rounded-lg px-2 py-1.5 text-sm bg-white"
+                      className="w-full mt-0.5 border border-negro-borde rounded-lg px-2 py-1.5 text-sm bg-negro text-gray-100"
                     >
                       {opciones.map((o) => (
                         <option key={o.producto_id} value={o.producto_id} disabled={o.stock <= 0}>
@@ -184,10 +186,10 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
               // Varios lugares: repartir entre gustos con +/- por opción.
               const suma = sumaGrupo(grupo);
               return (
-                <div key={grupo} className="border rounded-lg p-2 bg-gray-50">
-                  <p className="text-xs font-semibold text-gray-700">
+                <div key={grupo} className="border border-negro-borde rounded-lg p-2 bg-negro">
+                  <p className="text-xs font-semibold text-gray-300">
                     Elegí {N} {grupo.toLowerCase()}s (gustos a tu gusto):
-                    <span className={`ml-1 ${suma === N ? "text-green-700" : "text-marca"}`}>
+                    <span className={`ml-1 ${suma === N ? "text-green-400" : "text-marca"}`}>
                       {suma}/{N}
                     </span>
                   </p>
@@ -197,14 +199,14 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
                       const sinUnidades = o.stock <= 0;
                       return (
                         <div key={o.producto_id} className="flex items-center gap-2 text-sm">
-                          <span className={`flex-1 ${sinUnidades ? "text-gray-400 line-through" : ""}`}>
+                          <span className={`flex-1 ${sinUnidades ? "text-gray-500 line-through" : "text-gray-200"}`}>
                             {o.nombre}
                           </span>
                           <button
                             type="button"
                             onClick={() => cambiarCantidad(grupo, o.producto_id, cant - 1)}
                             disabled={cant === 0}
-                            className="w-6 h-6 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-30"
+                            className="w-6 h-6 rounded bg-negro-borde hover:bg-gray-600 disabled:opacity-30"
                             aria-label={`Quitar una ${o.nombre}`}
                           >
                             −
@@ -216,7 +218,7 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
                             // No se puede pasar del total de lugares del grupo
                             // (ni pedir más de lo que hay en stock de la opción).
                             disabled={suma >= N || cant >= o.stock}
-                            className="w-6 h-6 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-30"
+                            className="w-6 h-6 rounded bg-negro-borde hover:bg-gray-600 disabled:opacity-30"
                             aria-label={`Agregar una ${o.nombre}`}
                           >
                             +
@@ -232,22 +234,22 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
         )}
 
         {producto.descripcion && (
-          <p className="text-sm text-gray-600 flex-1">{producto.descripcion}</p>
+          <p className="text-sm text-gray-400 flex-1">{producto.descripcion}</p>
         )}
 
         {/* Precios */}
         <div className="mt-2">
           {producto.en_oferta && producto.precio_oferta != null ? (
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 line-through text-sm">
+              <span className="text-gray-500 line-through text-sm">
                 ${producto.precio.toLocaleString("es-AR")}
               </span>
-              <span className="text-marca font-bold text-xl">
+              <span className="text-marca font-bold text-lg">
                 ${producto.precio_oferta.toLocaleString("es-AR")}
               </span>
             </div>
           ) : (
-            <span className="font-bold text-xl">
+            <span className="font-bold text-lg text-marca">
               ${producto.precio.toLocaleString("es-AR")}
             </span>
           )}
@@ -257,7 +259,7 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
           onClick={agregarAlCarrito}
           disabled={sinStock || !gruposCompletos}
           title={!gruposCompletos ? "Completá las opciones a elección primero" : undefined}
-          className="mt-3 bg-marca text-white py-2 rounded-lg font-semibold hover:bg-marca-oscura disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="mt-2 bg-marca text-black py-1.5 rounded-lg text-sm font-semibold hover:bg-marca-clara disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           {sinStock ? "Sin stock" : cantidad > 0 ? "Agregar una más" : "Agregar"}
         </button>

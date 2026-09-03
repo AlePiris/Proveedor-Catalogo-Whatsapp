@@ -34,9 +34,9 @@ export default function Analisis() {
 
         {/* Selector de rango: recarga la tabla de abajo. */}
         <div className="mb-3">
-          <label className="text-sm text-gray-600 mr-2">Mostrar:</label>
+          <label className="text-sm text-gray-300 mr-2">Mostrar:</label>
           <select
-            className="border rounded px-2 py-1"
+            className="border-negro-borde bg-negro text-gray-100 rounded px-2 py-1"
             value={dias}
             onChange={(e) => setDias(parseInt(e.target.value))}
           >
@@ -51,15 +51,15 @@ export default function Analisis() {
             vistazo los días fuertes y los flojos. */}
         <div className="space-y-2">
           {porDia.map((d) => (
-            <div key={d.fecha} className="bg-white border rounded p-3">
+            <div key={d.fecha} className="bg-negro-panel border border-negro-borde rounded p-3">
               <div className="flex justify-between mb-1">
-                <span className="font-semibold">{formatearDia(d.fecha)}</span>
-                <span className="text-sm">
+                <span className="font-semibold text-gray-100">{formatearDia(d.fecha)}</span>
+                <span className="text-sm text-gray-300">
                   {d.pedidos} pedido(s) — {d.unidades} u. — $
                   {d.ingreso_total.toLocaleString("es-AR")}
                 </span>
               </div>
-              <div className="bg-gray-100 rounded h-3 overflow-hidden">
+              <div className="bg-negro-borde rounded h-3 overflow-hidden">
                 <div
                   className="bg-marca h-3"
                   style={{ width: `${(d.ingreso_total / Math.max(1, ...porDia.map((x) => x.ingreso_total))) * 100}%` }}
@@ -68,7 +68,7 @@ export default function Analisis() {
             </div>
           ))}
           {porDia.length > 0 && porDia.every((d) => d.pedidos === 0) && (
-            <p className="text-gray-500">
+            <p className="text-gray-400">
               Sin ventas confirmadas en este rango. Confirmá pedidos desde la
               tab Pedidos para verlos acá.
             </p>
@@ -79,7 +79,7 @@ export default function Analisis() {
       <section>
         <h2 className="font-bold mb-3">Lo más vendido (pedidos confirmados)</h2>
         {datos.length === 0 && !error && (
-          <p className="text-gray-500">
+          <p className="text-gray-400">
             Aún no hay pedidos confirmados. Cuando confirmes ventas acá aparecerán
             los productos más pedidos.
           </p>
@@ -87,15 +87,15 @@ export default function Analisis() {
 
         <div className="space-y-2">
           {datos.map((d, i) => (
-            <div key={i} className="bg-white border rounded p-3">
+            <div key={i} className="bg-negro-panel border border-negro-borde rounded p-3">
               <div className="flex justify-between mb-1">
-                <span className="font-semibold">{d.nombre}</span>
-                <span className="text-sm">
+                <span className="font-semibold text-gray-100">{d.nombre}</span>
+                <span className="text-sm text-gray-300">
                   {d.cantidad_total} u. — ${d.ingreso_total.toLocaleString("es-AR")}
                 </span>
               </div>
               {/* Barra proporcional a la cantidad vendida. */}
-              <div className="bg-gray-100 rounded h-3 overflow-hidden">
+              <div className="bg-negro-borde rounded h-3 overflow-hidden">
                 <div
                   className="bg-marca h-3"
                   style={{ width: `${(d.cantidad_total / maxCant) * 100}%` }}
