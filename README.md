@@ -1,4 +1,4 @@
-# 🍕 Pizzería Web — Trabajo Integrador (Frontend + Backend)
+# Proveedor Web — Trabajo Integrador (Frontend + Backend)
 
 Web para una pizzería que **no cobra online**: el cliente arma el carrito, se
 envía un pedido por **WhatsApp** y **se guarda en la base de datos** como
