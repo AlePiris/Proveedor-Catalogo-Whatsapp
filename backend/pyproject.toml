@@ -5,3 +5,9 @@
 # Así Vercel sabe qué servir como función serverless sin depender de autodetección.
 [tool.vercel]
 entrypoint = "app.main:app"
+
+# Corre de tests: venv\Scripts\python.exe -m pytest (desde backend/).
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# pythonpath: para que `import app.main` resuelva sin instalar el paquete.
+pythonpath = ["."]

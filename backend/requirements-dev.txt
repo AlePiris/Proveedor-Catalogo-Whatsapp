@@ -1,0 +1,9 @@
+# Dependencias SOLO de desarrollo/tests. La app en producción usa requirements.txt.
+# Instalar: venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+# Framework de tests: descubre y corre tests/test_*.py.
+pytest
+
+# Cliente HTTP que usa fastapi.testclient.TestClient para llamar a los
+# endpoints sin levantar servidor.
+httpx
