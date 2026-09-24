@@ -65,13 +65,6 @@ export default function Tienda() {
     ...desconocidas.map((n) => ({ nombre: n, productos: porCategoria.get(n)! })),
   ];
 
-  // Slides del carrusel: primero los combos, después las ofertas. Cada slide
-  // sabe a qué sección lleva al usuario cuando lo tocan (scroll a la sección).
-  const slides = [
-    ...combos.map((c) => ({ tipo: "combo" as const, producto: c, destino: "combos" })),
-    ...ofertas.map((o) => ({ tipo: "oferta" as const, producto: o, destino: "ofertas" })),
-  ];
-
   return (
     <div className="min-h-full bg-negro">
       <Navbar />
@@ -79,9 +72,33 @@ export default function Tienda() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         <h1 className="text-2xl font-bold text-gray-100 mb-4">Nuestros productos</h1>
 
-        {/* Carrusel de promos: gira solo entre combos y ofertas. Al tocarlo
-            lleva a la sección correspondiente de la página. */}
-        <CarruselPromos slides={slides} />
+        {/* Carruseles de promos arriba de todo: UNO de combos y OTRO de
+            ofertas (antes era un solo banner que mezclaba ambos). Cada uno
+            gira solo entre sus productos; tocarlo scrollea hasta su sección,
+            que vive al final de la página, después de las categorías. */}
+        <style>{`
+          @keyframes carrusel-in {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: none; }
+          }
+          .carrusel-in { animation: carrusel-in 0.35s ease; }
+        `}</style>
+        {combos.length > 0 && (
+          <CarruselPromos
+            tipo="combo"
+            titulo="Combos y especiales"
+            productos={combos}
+            destino="combos"
+          />
+        )}
+        {ofertas.length > 0 && (
+          <CarruselPromos
+            tipo="oferta"
+            titulo="Ofertas"
+            productos={ofertas}
+            destino="ofertas"
+          />
+        )}
 
         {cargando && <p className="text-gray-300">Cargando…</p>}
         {error && <p className="text-marca">Error: {error}</p>}
@@ -91,11 +108,25 @@ export default function Tienda() {
             panel debajo. Solo se muestra cuando hay algo en el carrito. */}
         <div className="lg:flex lg:items-start lg:gap-6">
           <div className="flex-1 min-w-0">
-            {/* Sección de COMBOS: primera, cards más grandes (2 por fila),
-                para darle protagonismo a las promos del dueño. Si no hay
-                combos activos, la sección ni se muestra. */}
-            {/* id = "combos": es donde scrollea el carrusel. Cards del MISMO
-                tamaño que el resto del catálogo (grid de 3 columnas). */}
+            {/* Catálogo: UNA SECCIÓN POR CATEGORÍA (Barritas, Proteicas,
+                Zero, Bebidas...), en el orden que definió el dueño. Van
+                PRIMERO en la página; combos y ofertas están al final. Solo
+                se muestran las categorías con productos. */}
+            {secciones.map((sec) => (
+              <section key={sec.nombre} id={`cat-${sec.nombre}`} className="mb-8 scroll-mt-20">
+                <h2 className="text-xl font-bold text-marca mb-3">{capitalizar(sec.nombre)}</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {sec.productos.map((p) => (
+                    <ProductoCard key={p.id} producto={p} />
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            {/* Sección de COMBOS: al final de la página, después de las
+                categorías (como pidió el dueño). id="combos": es a donde
+                scrollea el carrusel de arriba. Cards del MISMO tamaño que
+                el resto del catálogo. */}
             {combos.length > 0 && (
               <section id="combos" className="mb-8 scroll-mt-20">
                 <h2 className="text-xl font-bold text-marca mb-3">🎉 Combos y especiales</h2>
@@ -107,8 +138,8 @@ export default function Tienda() {
               </section>
             )}
 
-            {/* Sección de OFERTAS: aparece primero, como pidió el dueño. */}
-            {/* id = "ofertas": destino del carrusel para las ofertas. */}
+            {/* Sección de OFERTAS: después de los combos. id="ofertas":
+                destino del carrusel de ofertas de arriba. */}
             {ofertas.length > 0 && (
               <section id="ofertas" className="mb-8 scroll-mt-20">
                 <h2 className="text-xl font-bold text-marca mb-3">🔥 Ofertas</h2>
@@ -119,20 +150,6 @@ export default function Tienda() {
                 </div>
               </section>
             )}
-
-            {/* Resto del catálogo: UNA SECCIÓN POR CATEGORÍA (Barritas,
-                Proteicas, Zero, Bebidas...), en el orden que definió el
-                dueño. Solo se muestran las categorías con productos. */}
-            {secciones.map((sec) => (
-              <section key={sec.nombre} id={`cat-${sec.nombre}`} className="mb-8 scroll-mt-20">
-                <h2 className="text-xl font-bold text-marca mb-3">{capitalizar(sec.nombre)}</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {sec.productos.map((p) => (
-                    <ProductoCard key={p.id} producto={p} />
-                  ))}
-                </div>
-              </section>
-            ))}
 
             {!cargando && !error && productos.length === 0 && (
               <p className="text-gray-300">No hay productos cargados todavía.</p>
@@ -221,28 +238,34 @@ function capitalizar(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ---------- Carrusel de promos (combos + ofertas) ----------
-// Gira solo cada 5 s entre todos los combos y ofertas del catálogo. Tocarlo
-// scrollea hasta la sección correspondiente (las cards ya están ahí, con el
-// mismo tamaño que el resto). Flechas y puntos: pausa el auto-giro un rato
-// (se reprograma el timeout en cada cambio de slide) y no scrollean.
+// ---------- Carrusel de promos (banner) ----------
+// El banner grande de siempre (fondo marca, gira solo cada 5 s), pero ahora
+// UNO POR SECCIÓN: recibe sus productos (solo combos o solo ofertas) y el id
+// de la sección a donde scrollea al tocarlo. Flechas y puntos: cambian de
+// slide y reinician el auto-giro; no scrollean.
 function CarruselPromos({
-  slides,
+  tipo,
+  titulo,
+  productos,
+  destino,
 }: {
-  slides: { tipo: "combo" | "oferta"; producto: Producto; destino: string }[];
+  tipo: "combo" | "oferta";
+  titulo: string;
+  productos: Producto[];
+  destino: string;
 }) {
   const [idx, setIdx] = useState(0);
 
   // Auto-giro: un setTimeout por slide (no setInterval) para que cada cambio
   // manual de flechas/puntos reinicie completo los 5 segundos.
   useEffect(() => {
-    if (slides.length <= 1) return;
-    const t = setTimeout(() => setIdx((i) => (i + 1) % slides.length), 5000);
+    if (productos.length <= 1) return;
+    const t = setTimeout(() => setIdx((i) => (i + 1) % productos.length), 5000);
     return () => clearTimeout(t);
-  }, [idx, slides.length]);
+  }, [idx, productos.length]);
 
-  if (slides.length === 0) return null;
-  const { tipo, producto: p, destino } = slides[idx];
+  if (productos.length === 0) return null;
+  const p = productos[idx];
 
   // Ir a la sección: los botones internos hacen stopPropagation para que un
   // click en ellos NO scrollee por accidente.
@@ -252,28 +275,19 @@ function CarruselPromos({
 
   return (
     <div className="relative mb-8">
-      {/* Animación de entrada del slide: keyframes locales al componente. */}
-      <style>{`
-        @keyframes carrusel-in {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: none; }
-        }
-        .carrusel-in { animation: carrusel-in 0.35s ease; }
-      `}</style>
-
       <div
         key={idx} // remount por slide = la animación entra en cada giro
         onClick={ir}
-        className="cursor-pointer rounded-2xl bg-marca text-black overflow-hidden flex items-center gap-4 p-4 sm:p-6 carrusel-in"
+        className="cursor-pointer rounded-2xl bg-marca text-black overflow-hidden flex items-center gap-4 p-3 sm:p-4 carrusel-in"
       >
         {p.imagen_url ? (
           <img
             src={p.imagen_url}
             alt={p.nombre}
-            className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl object-cover shrink-0"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0"
           />
         ) : (
-          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-black/20 flex items-center justify-center text-5xl shrink-0">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-black/20 flex items-center justify-center text-5xl shrink-0">
             {tipo === "combo" ? "🎉" : "🔥"}
           </div>
         )}
@@ -288,7 +302,7 @@ function CarruselPromos({
               </span>
             )}
           </div>
-          <h3 className="font-bold text-lg sm:text-2xl truncate">{p.nombre}</h3>
+          <h3 className="font-bold text-sm sm:text-lg truncate">{p.nombre}</h3>
           <p className="text-sm sm:text-base">
             ${precioEfectivo(p).toLocaleString("es-AR")}
             {tipo === "oferta" && (
@@ -297,41 +311,43 @@ function CarruselPromos({
               </span>
             )}
           </p>
-          <p className="text-xs text-black/70 mt-1">
-            Tocá para ver en {tipo === "combo" ? "Combos y especiales" : "Ofertas"} →
-          </p>
+          <p className="text-xs text-black/70 mt-1">Tocá para ver en {titulo} →</p>
         </div>
       </div>
 
-      {/* Flechas (desktop) */}
-      <button
-        onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + slides.length) % slides.length); }}
-        aria-label="Promo anterior"
-        className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-negro text-white border border-gray-500 hover:bg-gray-800 items-center justify-center shadow"
-      >
-        ‹
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % slides.length); }}
-        aria-label="Promo siguiente"
-        className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-negro text-white border border-gray-500 hover:bg-gray-800 items-center justify-center shadow"
-      >
-        ›
-      </button>
-
-      {/* Puntos: uno por slide, tocás y vas directo (y reinicia los 5 s) */}
-      <div className="flex justify-center gap-1.5 mt-2">
-        {slides.map((_, i) => (
+      {/* Flechas (desktop): chicas y semitransparente sobre el banner. */}
+      {productos.length > 1 && (
+        <>
           <button
-            key={i}
-            onClick={(e) => { e.stopPropagation(); setIdx(i); }}
-            aria-label={`Ir a la promo ${i + 1}`}
-            className={`h-2 rounded-full transition-all ${
-              i === idx ? "w-5 bg-marca" : "w-2 bg-gray-600 hover:bg-gray-500"
-            }`}
-          />
-        ))}
-      </div>
+            onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + productos.length) % productos.length); }}
+            aria-label="Promo anterior"
+            className="hidden sm:flex absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white text-sm border border-white/20 hover:bg-black/65 items-center justify-center transition"
+          >
+            ‹
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % productos.length); }}
+            aria-label="Promo siguiente"
+            className="hidden sm:flex absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white text-sm border border-white/20 hover:bg-black/65 items-center justify-center transition"
+          >
+            ›
+          </button>
+
+          {/* Puntos: uno por slide, tocás y vas directo (y reinicia los 5 s) */}
+          <div className="flex justify-center gap-1.5 mt-2">
+            {productos.map((_, i) => (
+              <button
+                key={i}
+                onClick={(e) => { e.stopPropagation(); setIdx(i); }}
+                aria-label={`Ir a la promo ${i + 1}`}
+                className={`h-2 rounded-full transition-all ${
+                  i === idx ? "w-5 bg-marca" : "w-2 bg-gray-600 hover:bg-gray-500"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
