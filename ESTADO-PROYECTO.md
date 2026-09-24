@@ -41,6 +41,22 @@ Si los puertos están ocupados por un server que quedó colgado:
 
 ---
 
+## Tests del backend
+
+```powershell
+cd backend
+.\venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt   # primera vez
+.\venv\Scripts\python.exe -m pytest -v
+```
+
+La suite corre contra una **base SQLite en memoria** (aislada por test) y
+escribe imágenes en un **directorio temporal**: nunca toca la base de
+desarrollo ni `backend/uploads/`. Cubre: galería de imágenes, stock efectivo
+de combos y ciclo de vida de pedidos. Diseño:
+`docs/superpowers/specs/2026-09-24-backend-tests-design.md`.
+
+---
+
 ## Arquitectura (resumen)
 
 **Monolito de 3 capas** separadas solo por HTTP/JSON:
