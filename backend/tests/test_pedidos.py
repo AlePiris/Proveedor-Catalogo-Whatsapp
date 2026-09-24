@@ -141,6 +141,28 @@ def test_producto_simple_rechaza_elecciones(cliente, crear_producto):
     assert resp.status_code == 400
 
 
+def test_pedido_publico_rechaza_item_manual(cliente, crear_producto):
+    """SEGURIDAD: el POST público NO acepta ítems sin producto_id. Si los
+    aceptara, cualquiera armaría desde afuera un pedido con el precio que
+    quiera (ej: una docena de empanadas a $50). La vía "a mano" existe SOLO
+    para el dueño, vía PUT admin (ver test_admin_editar_agrega_item_manual).
+    """
+    p = crear_producto()
+    resp = _crear_pedido(
+        cliente,
+        [
+            {"producto_id": p["id"], "cantidad": 1},
+            {
+                "producto_id": None,
+                "nombre": "Docena trucho",
+                "precio_unitario": 50,
+                "cantidad": 1,
+            },
+        ],
+    )
+    assert resp.status_code == 400
+
+
 def test_delivery_sin_direccion_400(cliente, crear_producto):
     p = crear_producto()
     resp = _crear_pedido(

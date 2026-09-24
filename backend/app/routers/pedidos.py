@@ -109,18 +109,25 @@ def _resolver_elecciones(combo: Producto, elecciones_in) -> list[dict]:
     ]
 
 
-def _construir_items(items_in, db: Session) -> list[PedidoItem]:
+def _construir_items(items_in, db: Session, *, es_admin: bool = False) -> list[PedidoItem]:
     """
     Convierte los items que vienen del cliente/dueño en PedidoItem ORM.
       - Con producto_id: SNAPSHOT de nombre y precio desde la DB (el precio
         vigente lo decide SIEMPRE el backend, no el cliente). 400 si no existe.
         Si es un combo con grupos, valida y guarda las ELECCIONES del cliente.
-      - Sin producto_id (ítem "Otro" que agrega el dueño en el editor): requiere
-        nombre + precio_unitario; queda como snapshot puro de este pedido.
+      - Sin producto_id (ítem "Otro"): SOLO admin (es_admin=True, el editor del
+        dueño). Requiere nombre + precio_unitario; queda como snapshot puro.
+        El POST público lo rechaza: si no, cualquiera armaría un pedido con
+        el precio que quiera desde afuera.
     """
     items_orm = []
     for it in items_in:
         if it.producto_id is None:
+            if not es_admin:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Los pedidos online solo incluyen productos del catálogo",
+                )
             # Ítem "Otro": el nombre lo escribe el dueño y el precio lo pone él,
             # así que acá SÍ se acepta el precio que viene (es rol admin).
             nombre = (it.nombre or "").strip()
@@ -404,7 +411,7 @@ def editar_pedido(
 
     # Reemplazo completo de items (simple y predecible para el frontend).
     if datos.items is not None:
-        items_nuevos = _construir_items(datos.items, db)
+        items_nuevos = _construir_items(datos.items, db, es_admin=True)
         _validar_stock(items_nuevos, db)
         # Los items VIEJOS vuelven al stock (se descuentan los nuevos abajo).
         # Así el editor nunca "pierde" unidades: queda exactamente lo que el
