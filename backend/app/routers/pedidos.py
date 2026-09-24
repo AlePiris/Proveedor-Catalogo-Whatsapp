@@ -154,6 +154,10 @@ def _construir_items(items_in, db: Session, *, es_admin: bool = False) -> list[P
             )
         # Precio vigente: si está en oferta y tiene precio_oferta, uso ese.
         precio = producto.precio_oferta if (producto.en_oferta and producto.precio_oferta) else producto.precio
+        # Precio NEGOCIADO (solo admin): el dueño cerró otro precio por
+        # WhatsApp. Pisa el snapshot de ESTE pedido; el catálogo queda intacto.
+        if es_admin and it.precio_unitario is not None:
+            precio = it.precio_unitario
         # Combos con grupos a elección: validamos contra las opciones del dueño
         # y guardamos qué eligió el cliente (se descuenta y reintegra eso).
         elecciones_json = None

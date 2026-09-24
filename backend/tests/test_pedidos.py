@@ -261,3 +261,28 @@ def test_admin_editar_agrega_item_manual_sin_producto(cliente, admin_headers, cr
     # El ítem manual no tiene stock asociado: el producto queda como estaba
     # tras el reemplazo (reintegró 1 y volvió a descontar 1).
     assert _stock(cliente, p["id"]) == 9
+
+
+def test_admin_editar_negocia_precio_del_catalogo(cliente, admin_headers, crear_producto):
+    """Negociación por WhatsApp: el dueño le cierra otro precio a un producto
+    del catálogo SOLO para este pedido (manda precio_unitario en el PUT).
+    El snapshot del pedido ve el precio negociado; el CATÁLOGO queda intacto.
+    """
+    p = crear_producto(precio=1000, stock=10)
+    pedido = _crear_pedido(cliente, [{"producto_id": p["id"], "cantidad": 2}]).json()
+    resp = cliente.put(
+        f"/api/admin/pedidos/{pedido['id']}",
+        json={
+            "items": [
+                {"producto_id": p["id"], "cantidad": 2, "precio_unitario": 700}
+            ]
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    cuerpo = resp.json()
+    # El pedido ve el precio negociado (2 x 700).
+    assert Decimal(cuerpo["items"][0]["precio_unitario"]) == 700
+    assert Decimal(cuerpo["total"]) == 1400
+    # El precio del catálogo NO se tocó: es una excepción de este pedido.
+    assert Decimal(cliente.get(f"/api/productos/{p['id']}").json()["precio"]) == 1000

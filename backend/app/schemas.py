@@ -243,7 +243,7 @@ class PedidoItemCreate(BaseModel):
     """
     producto_id: Optional[int] = None
     nombre: Optional[str] = None      # solo para el ítem "Otro"
-    precio_unitario: Optional[Decimal] = None  # solo para el ítem "Otro" (lo pone el dueño)
+    precio_unitario: Optional[Decimal] = None  # "Otro" (precio a mano) o precio NEGOCIADO del dueño sobre un item del catálogo (solo admin; el público lo ignora)
     cantidad: int = Field(gt=0)  # debe ser > 0
     elecciones: Optional[list[EleccionCreate]] = None  # solo para combos con grupos
 
