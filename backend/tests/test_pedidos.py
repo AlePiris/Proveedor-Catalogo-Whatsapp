@@ -182,6 +182,14 @@ def test_confirmar_fija_estado(cliente, admin_headers, crear_producto):
         f"/api/admin/pedidos/{pedido['id']}/cancelar", headers=admin_headers
     )
     assert resp.status_code == 400
+    # EDITAR también pasa por el mismo contrato (solo pendiente): si alguien
+    # "simplifica" editar_pedido sin el chequeo, este PUT lo pinta de rojo.
+    resp = cliente.put(
+        f"/api/admin/pedidos/{pedido['id']}",
+        json={"items": [{"producto_id": p["id"], "cantidad": 5}]},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 400
 
 
 def test_editar_items_recalcula_total_y_diferencia_de_stock(
@@ -200,3 +208,34 @@ def test_editar_items_recalcula_total_y_diferencia_de_stock(
     assert Decimal(resp.json()["total"]) == 2000
     # Reintegró los 4 viejos y volvió a descontar los 2 nuevos: queda 8.
     assert _stock(cliente, p["id"]) == 8
+
+
+def test_admin_editar_agrega_item_manual_sin_producto(cliente, admin_headers, crear_producto):
+    """El ítem "Otro" (sin producto_id) es la vía del DUEÑO para sumar al
+    pedido lo acordado por WhatsApp (un extra que no está en el menú).
+
+    Este test fija ese lado PREVISTO del contrato. El POST público hoy
+    también acepta ítems manuales sin chequeo de rol (hallazgo conocido,
+    pendiente de decisión): cuando eso se arregle, este test define lo que
+    el fix NO tiene que romper — editar como admin sigue pudiendo.
+    """
+    p = crear_producto(precio=1000, stock=10)
+    pedido = _crear_pedido(cliente, [{"producto_id": p["id"], "cantidad": 1}]).json()
+    resp = cliente.put(
+        f"/api/admin/pedidos/{pedido['id']}",
+        json={
+            "items": [
+                {"producto_id": p["id"], "cantidad": 1},
+                {"producto_id": None, "nombre": "Bacon extra",
+                 "precio_unitario": 500, "cantidad": 1},
+            ]
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    cuerpo = resp.json()
+    assert Decimal(cuerpo["total"]) == 1500  # 1000 del producto + 500 manual
+    assert cuerpo["items"][1]["nombre"] == "Bacon extra"
+    # El ítem manual no tiene stock asociado: el producto queda como estaba
+    # tras el reemplazo (reintegró 1 y volvió a descontar 1).
+    assert _stock(cliente, p["id"]) == 9
