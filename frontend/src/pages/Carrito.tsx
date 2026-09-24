@@ -218,7 +218,7 @@ export default function Carrito() {
 
               <textarea
                 className="w-full border border-negro-borde rounded-lg px-3 py-2 bg-negro text-gray-100 placeholder:text-gray-500"
-                placeholder="Notas (ej. con servilletas, sin orégano, entregá a las 20:30)"
+                placeholder="Notas (ej. Entrega entre 13.30 a 18.00)"
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
                 rows={2}

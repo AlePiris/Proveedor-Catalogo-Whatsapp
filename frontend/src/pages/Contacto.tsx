@@ -31,7 +31,7 @@ export default function Contacto() {
         {config && (
           <div className="bg-negro-panel border border-negro-borde rounded-xl shadow-sm p-6 space-y-4">
             <div>
-              <h2 className="text-xl font-bold text-marca">🍫 {config.nombre}</h2>
+              <h2 className="text-xl font-bold text-marca"> {config.nombre}</h2>
               {config.descripcion && <p className="text-gray-400 mt-1">{config.descripcion}</p>}
             </div>
 
