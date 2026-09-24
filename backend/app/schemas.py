@@ -92,6 +92,15 @@ class OfertaUpdate(BaseModel):
     precio_oferta: Optional[Decimal] = None  # si en_oferta=False, se ignora/limpia
 
 
+class ProductoImagenOut(BaseModel):
+    """Una foto del producto (la galería del detalle usa todas; la principal
+    además vive denormalizada en producto.imagen_url)."""
+    id: int
+    url: str
+    orden: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProductoOut(ProductoBase):
     """Lo que se devuelve al cliente. Suma el id y fechas."""
     id: int
@@ -99,6 +108,9 @@ class ProductoOut(ProductoBase):
     updated_at: datetime
     # Componentes SI el producto es un combo (siempre los trae, vacío en el resto).
     combo_items: list["ComboItemOut"] = []
+    # TODAS las fotos del producto (galería del detalle). El admin las gestiona;
+    # si está vacío y hay imagen_url, el frontend usa esa como fallback.
+    imagenes: list[ProductoImagenOut] = []
 
     # Permite leer datos desde un objeto SQLAlchemy (orm_mode). Sin esto,
     # Pydantic no sabría convertir un modelo ORM en respuesta JSON.

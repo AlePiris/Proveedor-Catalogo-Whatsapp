@@ -14,9 +14,10 @@
 // que no entran (ej: la más cara). El grupo es "N lugares a repartir": en un
 // combo de 6 empanadas el cliente mezcla gustos (3 carne + 3 queso); una
 // bebida a elección (N=1) es elegir una sola.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { gruposCombo, type Producto } from "@/types";
+import AdminGaleriaImagenes from "@/components/AdminGaleriaImagenes";
 
 // Fila del editor de componentes. Dos formas:
 //  - FIJA: un producto concreto (producto_id + cantidad).
@@ -253,8 +254,6 @@ function AdminComboCard({
   onRecargar: () => Promise<void>;
   onError: (m: string) => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-
   // Nombre/desc/precio/etiqueta/stock editables onBlur (patrón de Productos).
   async function editar(cambios: Partial<Producto>) {
     try {
@@ -267,34 +266,18 @@ function AdminComboCard({
 
   return (
     <div className={`border border-negro-borde rounded-xl bg-negro-panel shadow-sm flex flex-col overflow-hidden text-gray-200 ${c.activo ? "" : "opacity-60"}`}>
-      <div className="relative">
+      {/* Imagen principal arriba + galería completa (subir/borrar/marcar
+          principal) igual que en la pestaña de productos. */}
+      <div>
         {c.imagen_url ? (
           <img src={c.imagen_url} alt={c.nombre} className="w-full h-32 object-cover" />
         ) : (
           <div className="w-full h-32 bg-marca/10 flex items-center justify-center text-4xl">🎉</div>
         )}
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="absolute bottom-1 right-1 bg-black/50 text-white text-xs px-2 py-1 rounded"
-        >
-          📷 Imagen
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            try {
-              await api.admin.uploadImagen(c.id, f);
-              await onRecargar();
-            } catch (err) {
-              onError((err as Error).message);
-            }
-          }}
-        />
+      </div>
+
+      <div className="p-3 pt-2">
+        <AdminGaleriaImagenes producto={c} onRecargar={() => void onRecargar()} onError={onError} />
       </div>
 
       <div className="p-3 flex flex-col gap-2 flex-1">

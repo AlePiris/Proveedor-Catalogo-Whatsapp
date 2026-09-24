@@ -33,7 +33,7 @@ backend/
 ├── app/
 │   ├── config.py      → Settings (pydantic-settings): lee .env (DATABASE_URL, JWT, CORS)
 │   ├── database.py    → Engine SQLAlchemy + SessionLocal + Base + get_db()
-│   ├── models.py      → Las 7 tablas como clases ORM (una clase = una tabla)
+│   ├── models.py      → Las 8 tablas como clases ORM (una clase = una tabla)
 │   ├── schemas.py     → Schemas Pydantic: lo que viaja por la API (in/out)
 │   ├── init_db.py     → Crea tablas (create_all) + micromigraciones (ALTER TABLE)
 │   └── routers/       → Endpoints que usan la DB a través de get_db()
@@ -52,9 +52,11 @@ Request HTTP → Router (FastAPI) → Depends(get_db) abre sesión SQLAlchemy
 
 ---
 
-## 3. Las tablas (7)
+## 3. Las tablas (8)
 
-Diagrama de relaciones:
+Diagrama de relaciones (los extremos `||` y `|{` son el "1" y el "N" de cada
+relación; versión visual completa en `docs/base-de-datos.html`, se abre en el
+navegador):
 
 ```mermaid
 erDiagram
@@ -62,6 +64,7 @@ erDiagram
     PEDIDO_ITEM }o--|| PRODUCTO : "producto_id (nullable, snapshot)"
     PRODUCTO ||--|{ COMBO_ITEM : "combo_id (cascade)"
     PRODUCTO ||--|{ COMBO_ITEM : "producto_id (componente)"
+    PRODUCTO ||--|{ PRODUCTO_IMAGEN : "galeria (cascade)"
 
     PRODUCTO {
         int id PK
@@ -97,6 +100,12 @@ erDiagram
         int cantidad "N unidades del componente"
         string grupo "null = fijo; label = opción a elección"
     }
+    PRODUCTO_IMAGEN {
+        int id PK
+        int producto_id FK
+        string url "ruta /uploads/<archivo>"
+        int orden "menor = primero en la galería"
+    }
 ```
 
 ### `productos`
@@ -109,6 +118,15 @@ Columnas principales: `nombre`, `descripcion`, `precio`, `precio_oferta` +
 `categorias`), `imagen_url`, `disponible` (bool, se apaga con stock=0),
 `mostrar_sin_stock` (alarma de stock), `orden`, `etiqueta` (badge libre),
 `activo` (interruptor de visibilidad), timestamps.
+
+### `producto_imagenes`
+La **galería de fotos** de un producto (soporte multi-imagen, agregada
+2026-09-14): `producto_id` (FK, cascade), `url` (ruta `/uploads/<archivo>`) y
+`orden` (menor = primero; la posición 0 es la que ve la galería del detalle).
+La foto **principal** vive además copiada en `productos.imagen_url`
+(denormalizada a propósito — ver 4.6). Antes de esta tabla, cada subida
+**pisaba** la foto anterior; ahora hace append, y el dueño puede marcar
+principal o borrar cada foto desde el panel.
 
 ### `categorias`
 Las secciones del menú (`id`, `nombre` único, `orden`). Editables por el dueño.
@@ -198,6 +216,15 @@ y cierra su conexión. En serverless (Vercel) cada invocación es efímera; un
 pool de conexiones moriría con la función y terminaría agotando las
 conexiones de Neon.
 
+### 4.6 `imagen_url` denormalizada (la galería es la fuente de verdad)
+`producto_imagenes` guarda TODAS las fotos, pero la principal está **copiada**
+en `productos.imagen_url`. Parece redundancia, pero es a propósito: las cards
+de la tienda, el carrusel y el carrito persistido en el navegador ya leen
+`imagen_url`; obligarlos a mirar la tabla sería tocar todo sin sumar nada. El
+backend mantiene la copia sincronizada: al marcar principal, al borrar la
+principal (promueve la siguiente) y en el backfill idempotente de
+`init_db.py` (productos históricos con `imagen_url` y sin filas → una fila).
+
 ---
 
 ## 5. Creación y migración de la base
@@ -254,8 +281,9 @@ credenciales); el `.db` tampoco (es dato local).
 
 ## 6. Resumen para la entrega
 
-- **Modelo relacional** de 7 tablas con SQLAlchemy ORM: productos, categorías,
-  combo_items, pedidos, pedido_items, admin_users, local_config.
+- **Modelo relacional** de 8 tablas con SQLAlchemy ORM: productos, categorías,
+  combo_items, producto_imagenes, pedidos, pedido_items, admin_users,
+  local_config.
 - **SQL** como lenguaje (estándar, portable), **SQLite** en desarrollo y
   **PostgreSQL (Neon)** en producción.
 - Integridad del negocio garantizada por el **backend**: precios siempre

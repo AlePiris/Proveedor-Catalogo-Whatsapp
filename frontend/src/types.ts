@@ -21,6 +21,17 @@ export interface Producto {
   updated_at: string;
   // Componentes SI el producto es un combo (categoria="combo"); [] en el resto.
   combo_items?: ComboItem[];
+  // TODAS las fotos del producto (galería del detalle). La PRINCIPAL además
+  // vive denormalizada en imagen_url (la leen cards, carrusel y carrito).
+  imagenes?: ProductoImagen[];
+}
+
+// Una foto de la galería del producto. El admin las gestiona (subir, borrar,
+// marcar principal); el detalle las muestra en orden.
+export interface ProductoImagen {
+  id: number;
+  url: string;
+  orden: number;
 }
 
 // Componente de un combo: describe el contenido (nombre/precio actuales del
@@ -50,6 +61,14 @@ export interface Eleccion {
 // Precio efectivo: si está en oferta y tiene precio_oferta, uso ese; si no, el normal.
 export function precioEfectivo(p: Producto): number {
   return p.en_oferta && p.precio_oferta != null ? p.precio_oferta : p.precio;
+}
+
+// URLs de TODAS las fotos para la galería del detalle, en orden. Fallback: si
+// el producto es histórico (su foto solo existía en imagen_url y la tabla no
+// tenía filas), usamos imagen_url como única foto.
+export function galeriaProducto(p: Producto): string[] {
+  const urls = (p.imagenes ?? []).map((i) => i.url);
+  return urls.length > 0 ? urls : p.imagen_url ? [p.imagen_url] : [];
 }
 
 // ¿Es combo? El dueño no elige "combo" manualmente: la categoría la fija el backend.

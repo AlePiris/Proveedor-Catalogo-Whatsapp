@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import type { Categoria, Producto } from "@/types";
 import { esCombo } from "@/types";
+import AdminGaleriaImagenes from "@/components/AdminGaleriaImagenes";
 
 export default function GestionProductos() {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -261,14 +262,8 @@ export default function GestionProductos() {
             onToggleOferta={toggleOferta}
             onToggleAlarma={toggleAlarma}
             onBorrar={borrar}
-            onSubirImagen={async (id, file) => {
-              try {
-                await api.admin.uploadImagen(id, file);
-                await cargar();
-              } catch (e) {
-                setError((e as Error).message);
-              }
-            }}
+            onRecargar={cargar}
+            onError={setError}
           />
         ))}
       </div>
@@ -284,7 +279,8 @@ function AdminProductoCard({
   onToggleOferta,
   onToggleAlarma,
   onBorrar,
-  onSubirImagen,
+  onRecargar,
+  onError,
 }: {
   producto: Producto;
   categorias: Categoria[];
@@ -292,9 +288,9 @@ function AdminProductoCard({
   onToggleOferta: (p: Producto) => void;
   onToggleAlarma: (p: Producto) => void;
   onBorrar: (p: Producto) => void;
-  onSubirImagen: (id: number, file: File) => void;
+  onRecargar: () => void;
+  onError: (msg: string) => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const oculto = p.stock <= 0 && !p.mostrar_sin_stock; // no lo ve el cliente
   // Opciones del select: las categorías de la tabla. Si el producto está en
   // una que no existe en la tabla (dato viejo), la agregamos al listado para
@@ -305,29 +301,17 @@ function AdminProductoCard({
 
   return (
     <div className={`border border-negro-borde rounded-xl bg-negro-panel shadow-sm flex flex-col overflow-hidden text-gray-200 ${oculto ? "opacity-60" : ""}`}>
-      {/* Imagen + botón cambiar */}
+      {/* Galería de fotos: la principal arriba (la de las cards) y el resto
+          como miniaturas. Subir/borrar/marcar principal vive en el componente. */}
       <div className="relative">
         {p.imagen_url ? (
           <img src={p.imagen_url} alt={p.nombre} className="w-full aspect-square object-cover" />
         ) : (
           <div className="w-full aspect-square bg-negro flex items-center justify-center text-4xl">🍫</div>
         )}
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="absolute bottom-1 right-1 bg-black/50 text-white text-xs px-2 py-1 rounded"
-        >
-          📷 Imagen
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onSubirImagen(p.id, f);
-          }}
-        />
+      </div>
+      <div className="p-3 pt-2">
+        <AdminGaleriaImagenes producto={p} onRecargar={onRecargar} onError={onError} />
       </div>
 
       <div className="p-3 flex flex-col gap-2">

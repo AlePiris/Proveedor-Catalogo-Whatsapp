@@ -85,6 +85,39 @@ class Producto(Base):
     combos_que_lo_incluyen = relationship(
         "ComboItem", back_populates="producto", foreign_keys="ComboItem.producto_id"
     )
+    # TODAS las fotos del producto (la galería de la página de detalle). La
+    # foto PRINCIPAL sigue viva además en la columna imagen_url.
+    imagenes = relationship(
+        "ProductoImagen",
+        back_populates="producto",
+        cascade="all, delete-orphan",  # borrar el producto borra sus fotos
+        order_by="ProductoImagen.orden",  # menor = primero en la galería
+    )
+
+
+class ProductoImagen(Base):
+    """
+    Una de las (posibles varias) fotos de un producto.
+
+    DECISIÓN — imagen_url sigue siendo la PRINCIPAL (denormalizada):
+    la tabla guarda TODAS las fotos (galería de la página de detalle),
+    pero producto.imagen_url conserva la foto PRINCIPAL: la primera subida
+    o la que el dueño marque. Las cards, el carrusel y el carrito persistido
+    en el navegador ya leen imagen_url; derivarla de la primera fila
+    obligaría a tocar todo sin sumar nada. La tabla es la fuente de verdad
+    de la GALERÍA; imagen_url, de la TAPA.
+    """
+
+    __tablename__ = "producto_imagenes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    # Ruta relativa que sirve StaticFiles (ej: "/uploads/12_abc123.jpg").
+    url = Column(String(255), nullable=False)
+    orden = Column(Integer, default=0, nullable=False)  # menor = primero en la galería
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    producto = relationship("Producto", back_populates="imagenes")
 
 
 class AdminUser(Base):

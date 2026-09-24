@@ -33,6 +33,7 @@ from app.models import (  # noqa: F401
     LocalConfig,
     ComboItem,
     Categoria,
+    ProductoImagen,
 )
 
 # Cada tupla: (tabla, columna, SQL completo del ALTER).
@@ -99,6 +100,24 @@ def main():
             print(f"  Migrando: {tabla}.{columna} ...")
             conn.execute(text(sql))
             tablas_cache[tabla].add(columna)
+
+    # Backfill multi-imagen: los productos HISTÓRICOS tienen su foto solo en
+    # productos.imagen_url (la tabla producto_imagenes ni existía). Les
+    # insertamos esa URL como única fila de la galería. Es idempotente (NOT
+    # EXISTS: solo productos sin filas). Los archivos huérfanos de uploads
+    # (fotos pisadas por el upload único de antes) NO se asocian: ya no
+    # sabemos cuál era la principal; el dueño las resube si las quiere.
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO producto_imagenes (producto_id, url, orden, created_at)
+            SELECT p.id, p.imagen_url, 0, CURRENT_TIMESTAMP
+            FROM productos p
+            WHERE p.imagen_url IS NOT NULL
+              AND p.imagen_url != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM producto_imagenes pi WHERE pi.producto_id = p.id
+              )
+        """))
 
     print("Listo.")
 

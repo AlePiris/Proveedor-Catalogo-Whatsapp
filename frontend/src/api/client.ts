@@ -116,6 +116,8 @@ export const api = {
       request<null>(`/combos/${id}`, { method: "DELETE" }, true),
     uploadImagen: async (id: number, file: File) => {
       // Subida de archivo: se manda como multipart/form-data (no JSON).
+      // El backend la AGREGA a la galería (ya no pisa la anterior); solo la
+      // primera subida pasa a ser la principal.
       const fd = new FormData();
       fd.append("archivo", file);
       const headers: Record<string, string> = { Accept: "application/json" };
@@ -125,6 +127,14 @@ export const api = {
       if (!res.ok) throw new Error("No se pudo subir la imagen");
       return (await res.json()) as Producto;
     },
+    deleteImagen: (productoId: number, imagenId: number) =>
+      request<null>(`/productos/${productoId}/imagen/${imagenId}`, { method: "DELETE" }, true),
+    setImagenPrincipal: (productoId: number, imagenId: number) =>
+      request<Producto>(
+        `/productos/${productoId}/imagen/${imagenId}/principal`,
+        { method: "PATCH" },
+        true
+      ),
 
     // Pedidos
     getPedidos: (estado?: string) =>

@@ -10,7 +10,10 @@ Endpoints de ADMIN (requieren token):
   POST   /api/productos            crear
   PUT    /api/productos/{id}       editar (precio, stock, etc.)
   PATCH  /api/productos/{id}/oferta  marcar/desmarcar oferta + precio
-  POST   /api/productos/{id}/imagen  subir imagen (archivo)
+  POST   /api/productos/{id}/imagen  subir imagen (archivo, AGREGA a la galería;
+                                    la primera subida pasa a ser la principal)
+  DELETE /api/productos/{id}/imagen/{imagen_id}  borrar UNA foto (fila + archivo)
+  PATCH  /api/productos/{id}/imagen/{imagen_id}/principal  elegir la principal
   DELETE /api/productos/{id}       borrar
 
 Combos (categoria="combo"): precio propio + componentes en combo_items.
@@ -26,6 +29,7 @@ Visibilidad para el cliente (endpoint público): un producto se muestra solo si
 Tiene stock > 0, O si el dueño activó `mostrar_sin_stock` (desactivó la alarma).
 Los que no se muestran, el dueño igual los ve en /api/productos/admin.
 """
+import glob
 import os
 import uuid
 
@@ -35,7 +39,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.database import get_db
-from app.models import Producto, ComboItem
+from app.models import Producto, ComboItem, ProductoImagen
 from app.schemas import (
     ProductoCreate,
     ProductoOut,
@@ -100,6 +104,11 @@ def _aplicar_stock_combos(db: Session, productos: list[Producto]) -> list[Produc
     leen ANTES de expungear, mientras la relación lazy-load sigue viva).
     """
     for p in productos:
+        # Forzar la carga de la galería ANTES del expunge: después, el objeto
+        # queda detached y no puede lazy-load (Pydantic lo serializa después y
+        # reventaría con DetachedInstanceError). Igual que combo_items, que ya
+        # se lee antes en _stock_combo_efectivo.
+        _ = p.imagenes
         if p.categoria == "combo":
             efectivo = _stock_combo_efectivo(p)
             db.expunge(p)
@@ -237,6 +246,13 @@ def borrar_producto(
     # Quita este producto de los combos que lo incluían. (El snapshot del
     # PedidoItem NO se toca: los pedidos históricos quedan intactos.)
     db.query(ComboItem).filter(ComboItem.producto_id == producto_id).delete()
+    # Limpia también los ARCHIVOS de uploads ({id}_<uuid>.<ext>): si no, quedan
+    # huérfanos ocupando disco. Las filas de producto_imagenes van por cascade.
+    for path in glob.glob(os.path.join(UPLOAD_DIR, f"{producto_id}_*")):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
     db.delete(producto)
     db.commit()
     return None
@@ -250,13 +266,18 @@ async def subir_imagen(
     _=Depends(require_admin),
 ):
     """
-    Sube una imagen para el producto. La guarda en backend/uploads/ y guarda
-    su ruta relativa (/uploads/<archivo>) en imagen_url.
+    Sube una imagen para el producto. La guarda en backend/uploads/ y la AGREGA
+    a la galería (fila en producto_imagenes con ruta relativa /uploads/<archivo>).
+
+    Ya NO pisa la anterior: el producto puede tener varias fotos (la página de
+    detalle muestra la galería completa). Solo si es la PRIMERA (sin filas NI
+    imagen_url) pasa a ser también la principal (imagen_url, la que ven las
+    cards y el carrusel). Para elegir otra principal está el PATCH .../principal.
 
     NOTA deploy: esto funciona en LOCAL (disco del backend). En Vercel (serverless)
     el disco no persiste entre invocaciones; para producción hay que migrar a
     Vercel Blob (@vercel/blob), que sube el archivo a su CDN y devuelve una URL
-    absoluta que se guarda igual en imagen_url.
+    absoluta que se guarda igual en la fila y en imagen_url.
     """
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if producto is None:
@@ -277,8 +298,89 @@ async def subir_imagen(
     with open(os.path.join(UPLOAD_DIR, nombre), "wb") as f:
         f.write(datos)
 
-    # Guardamos ruta relativa. En dev la sirve StaticFiles montado en /uploads.
-    producto.imagen_url = f"/uploads/{nombre}"
+    # APPEND a la galería. "Sin filas NI imagen_url" (no solo "sin filas"):
+    # si el dueño seteó imagen_url a mano por PUT y recién ahora sube una foto,
+    # esa foto NO debe robarle la principal.
+    url = f"/uploads/{nombre}"
+    es_primera = len(producto.imagenes) == 0 and not producto.imagen_url
+    db.add(ProductoImagen(producto_id=producto.id, url=url, orden=len(producto.imagenes)))
+    if es_primera:
+        producto.imagen_url = url
+    db.commit()
+    db.refresh(producto)
+    return producto
+
+
+@router.delete("/{producto_id}/imagen/{imagen_id}", status_code=204)
+def borrar_imagen(
+    producto_id: int,
+    imagen_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """
+    Borra UNA foto de la galería: la fila Y el archivo físico de uploads (si
+    no borramos el archivo, queda huérfano ocupando disco). Si era la PRINCIPAL,
+    imagen_url pasa a la foto que queda primera por orden (o None si no queda
+    ninguna).
+    """
+    imagen = db.query(ProductoImagen).filter(
+        ProductoImagen.id == imagen_id, ProductoImagen.producto_id == producto_id
+    ).first()
+    if imagen is None:
+        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+    # El archivo físico: la url es "/uploads/<nombre>" -> nos quedamos con la
+    # parte final. try/except: si ya lo borraron a mano, no rompemos por eso.
+    archivo = os.path.join(UPLOAD_DIR, imagen.url.rsplit("/", 1)[-1])
+    try:
+        os.remove(archivo)
+    except OSError:
+        pass
+
+    producto = db.query(Producto).filter(Producto.id == producto_id).first()
+    era_principal = producto.imagen_url == imagen.url
+    db.delete(imagen)
+    db.commit()
+
+    if era_principal:
+        # La principal cae: promote la siguiente de la galería (por orden, y
+        # por id como desempate para fotos subidas con el mismo orden 0).
+        siguiente = (
+            db.query(ProductoImagen)
+            .filter(ProductoImagen.producto_id == producto_id)
+            .order_by(ProductoImagen.orden.asc(), ProductoImagen.id.asc())
+            .first()
+        )
+        producto.imagen_url = siguiente.url if siguiente else None
+        db.commit()
+    return None
+
+
+@router.patch("/{producto_id}/imagen/{imagen_id}/principal", response_model=ProductoOut)
+def marcar_imagen_principal(
+    producto_id: int,
+    imagen_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """
+    El dueño elige qué foto es la PRINCIPAL (la que ven las cards y el carrusel):
+    la movemos al frente del orden de la galería y actualizamos imagen_url.
+    """
+    producto = db.query(Producto).filter(Producto.id == producto_id).first()
+    if producto is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    imagen = next((i for i in producto.imagenes if i.id == imagen_id), None)
+    if imagen is None:
+        raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+    producto.imagenes.remove(imagen)
+    producto.imagenes.insert(0, imagen)
+    # Renumera el orden completo: la elegida queda 0 y el resto la sigue.
+    for idx, img in enumerate(producto.imagenes):
+        img.orden = idx
+    producto.imagen_url = imagen.url
     db.commit()
     db.refresh(producto)
     return producto

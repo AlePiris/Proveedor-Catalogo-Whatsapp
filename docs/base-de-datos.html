@@ -1,0 +1,665 @@
+<title>Base de datos El Gordito</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ---------- Tokens (dark-first: la identidad del panel de El Gordito) ---------- */
+  :root {
+    --bg: #0A0A0A;
+    --panel: #171717;
+    --panel-2: #1E1E1E;
+    --border: #2B2B2B;
+    --fg: #EDEDED;
+    --muted: #9B9B9B;
+    --faint: #6B6B6B;
+    --accent: #FFD230;       /* el "marca" del proyecto: fills y detalles */
+    --accent-ink: #0A0A0A;   /* texto sobre el amarillo */
+    --accent-text: #FFD230;  /* el amarillo como TEXTO sobre fondo oscuro */
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #F7F5EE;
+      --panel: #FFFFFF;
+      --panel-2: #F1EEE4;
+      --border: #E0DCCE;
+      --fg: #1B1912;
+      --muted: #6E6A5C;
+      --faint: #948F7F;
+      --accent: #FFD230;
+      --accent-ink: #1B1912;
+      --accent-text: #8F6B00;  /* amarillo oscurecido para leer como texto */
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F5EE;
+    --panel: #FFFFFF;
+    --panel-2: #F1EEE4;
+    --border: #E0DCCE;
+    --fg: #1B1912;
+    --muted: #6E6A5C;
+    --faint: #948F7F;
+    --accent: #FFD230;
+    --accent-ink: #1B1912;
+    --accent-text: #8F6B00;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 0 20px 64px;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+
+  h1, h2 { text-wrap: balance; line-height: 1.2; }
+  h1 { font-size: 30px; font-weight: 700; margin: 48px 0 8px; letter-spacing: -0.5px; }
+  h2 { font-size: 20px; font-weight: 700; margin: 48px 0 14px; }
+  h3 { font-size: 15px; font-weight: 600; margin: 0; }
+  p { margin: 0 0 12px; }
+  .lead { font-size: 16.5px; max-width: 62ch; color: var(--fg); }
+  .sub { color: var(--muted); max-width: 62ch; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-text);
+    margin: 56px 0 6px;
+  }
+
+  /* ---------- Chips de encabezado ---------- */
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 8px; }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    background: var(--panel);
+    white-space: nowrap;
+  }
+  .chip strong { color: var(--fg); font-weight: 600; }
+
+  /* ---------- Diagrama ---------- */
+  .diagram-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 12px;
+    margin: 16px 0 0;
+  }
+  .diagram-wrap svg {
+    display: block;
+    min-width: 760px;
+    width: 100%;
+    height: auto;
+    color: var(--fg);
+  }
+  figure { margin: 0; }
+  figcaption {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 10px 6px 0;
+    max-width: 70ch;
+  }
+
+  /* SVG: entidades */
+  .ent   { fill: var(--panel-2); stroke: var(--border); }
+  .band  { fill: var(--accent); }
+  .etitle { font-family: var(--mono); font-size: 13px; font-weight: 600; fill: var(--accent-ink); }
+  .ef    { font-family: var(--mono); font-size: 12px; fill: var(--fg); }
+  .ef-dim { fill: var(--muted); }
+  .ek    { font-family: var(--mono); font-size: 11px; font-weight: 600; fill: var(--accent-text); }
+  .edge  { stroke: var(--faint); stroke-width: 1.5; fill: none; }
+  .edge-dashed { stroke: var(--faint); stroke-width: 1.5; fill: none; stroke-dasharray: 6 5; }
+  .elabel { font-family: var(--sans); font-size: 11px; fill: var(--muted); }
+  .card-lab { font-family: var(--mono); font-size: 13px; font-weight: 700; fill: var(--accent-text); }
+  .new-badge { font-family: var(--mono); font-size: 10px; font-weight: 700; fill: var(--accent-text); letter-spacing: 0.12em; }
+
+  /* ---------- Leyenda ---------- */
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 14px 0 0; padding: 0 6px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .k-swatch { width: 26px; height: 0; border-top: 1.5px solid var(--faint); flex: none; }
+  .k-swatch.dashed { border-top-style: dashed; }
+  .k-swatch.bandmini { width: 14px; height: 10px; border: 0; background: var(--accent); border-radius: 2px; }
+
+  /* ---------- Referencia tabla por tabla ---------- */
+  .tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px; margin-top: 16px; }
+  @media (max-width: 500px) { .tables { grid-template-columns: 1fr; } }
+  .tbl {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .tbl-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); }
+  .tbl-head .tname { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--fg); }
+  .tbl-head .trole { font-size: 12.5px; color: var(--muted); margin: 3px 0 0; }
+  .cols { list-style: none; margin: 0; padding: 6px 0; }
+  .cols li {
+    display: grid;
+    grid-template-columns: minmax(120px, 42%) minmax(110px, 33%) 1fr;
+    gap: 8px;
+    padding: 5px 14px;
+    font-size: 12.5px;
+    align-items: baseline;
+  }
+  .cols li:nth-child(odd) { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
+  .cname { font-family: var(--mono); font-weight: 500; color: var(--fg); word-break: break-all; }
+  .ctype { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .cnote { color: var(--muted); font-size: 12px; }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.5px 5px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .tag-pk { background: var(--accent); color: var(--accent-ink); }
+  .tag-fk { background: transparent; color: var(--accent-text); border: 1px solid var(--accent-text); }
+  .tag-new { background: var(--accent); color: var(--accent-ink); }
+
+  /* ---------- Relaciones ---------- */
+  .rel {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    padding: 14px 16px;
+    margin-top: 12px;
+  }
+  .rel-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rel-line .rt {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--accent);
+    color: var(--accent-ink);
+    padding: 2px 9px;
+    border-radius: 6px;
+  }
+  .rel-line .rmark { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent-text); letter-spacing: 0.05em; }
+  .rel p { margin: 9px 0 0; font-size: 13.5px; color: var(--muted); max-width: 75ch; }
+  .rel p strong { color: var(--fg); font-weight: 600; }
+
+  /* ---------- Decisiones ---------- */
+  .decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; margin-top: 14px; }
+  @media (max-width: 500px) { .decisions { grid-template-columns: 1fr; } }
+  .dec {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    background: var(--panel);
+    padding: 12px 14px;
+  }
+  .dec h3 { margin: 0 0 6px; font-size: 13.5px; }
+  .dec p { margin: 0; font-size: 13px; color: var(--muted); }
+  .dec code, .rel code, .sub code, .cnote code, p code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 4px;
+  }
+
+  .card-note {
+    margin-top: 22px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+</style>
+<main>
+  <header>
+    <p class="eyebrow">Referencia técnica · backend/app/models.py</p>
+    <h1>Base de datos — El Gordito</h1>
+    <p class="lead">Las 8 tablas del e-commerce: qué guarda cada una, cómo se conectan y
+    por qué está diseñada así. El motor es <strong>SQLite</strong> en desarrollo y
+    <strong>Postgres/Neon</strong> en producción (los tipos son portables entre ambos).</p>
+    <div class="stats">
+      <span class="chip"><strong>8</strong> tablas</span>
+      <span class="chip"><strong>5</strong> llaves foráneas (FK)</span>
+      <span class="chip"><strong>1</strong> relación lógica sin FK (por texto)</span>
+      <span class="chip"><strong>1</strong> singleton (local_config)</span>
+      <span class="chip"><strong>1</strong> tabla aislada (admin_users)</span>
+    </div>
+  </header>
+
+  <!-- ==================== DIAGRAMA ==================== -->
+  <figure>
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 1000 560" role="img" aria-label="Diagrama entidad-relación: categorías y productos arriba; producto_imagenes a la derecha con relación 1 a N; combo_items abajo de productos con doble FK; pedidos y pedido_items abajo con relación 1 a N y N a 1 hacia productos; admin_users y local_config aisladas a la derecha.">
+        <!-- ============ categorias ============ -->
+        <rect class="ent" x="30" y="110" width="180" height="80"/>
+        <rect class="band" x="30" y="110" width="180" height="24"/>
+        <text class="etitle" x="40" y="126">categorias</text>
+        <text class="ef" x="40" y="150">id <tspan class="ek">PK</tspan></text>
+        <text class="ef" x="40" y="166">nombre <tspan class="ek">UQ</tspan></text>
+        <text class="ef" x="40" y="182">orden</text>
+
+        <!-- ============ productos ============ -->
+        <rect class="ent" x="395" y="60" width="240" height="112"/>
+        <rect class="band" x="395" y="60" width="240" height="24"/>
+        <text class="etitle" x="405" y="76">productos</text>
+        <text class="ef" x="405" y="100">id <tspan class="ek">PK</tspan></text>
+        <text class="ef" x="405" y="116">nombre · precio · stock</text>
+        <text class="ef" x="405" y="132">imagen_url <tspan class="ef-dim">(principal)</tspan></text>
+        <text class="ef" x="405" y="148">categoria <tspan class="ef-dim">VARCHAR — sin FK</tspan></text>
+        <text class="ef ef-dim" x="405" y="164">+ etiqueta · activo · oferta …</text>
+
+        <!-- ============ producto_imagenes ============ -->
+        <text class="new-badge" x="955" y="86" text-anchor="end">NUEVA</text>
+        <rect class="ent" x="720" y="95" width="235" height="96"/>
+        <rect class="band" x="720" y="95" width="235" height="24"/>
+        <text class="etitle" x="730" y="111">producto_imagenes</text>
+        <text class="ef" x="730" y="135">id <tspan class="ek">PK</tspan></text>
+        <text class="ef" x="730" y="151">producto_id <tspan class="ek">FK</tspan></text>
+        <text class="ef" x="730" y="167">url · orden</text>
+        <text class="ef ef-dim" x="730" y="183">la galería de fotos</text>
+
+        <!-- ============ combo_items ============ -->
+        <rect class="ent" x="395" y="280" width="240" height="96"/>
+        <rect class="band" x="395" y="280" width="240" height="24"/>
+        <text class="etitle" x="405" y="296">combo_items</text>
+        <text class="ef" x="405" y="320">combo_id <tspan class="ek">FK</tspan></text>
+        <text class="ef" x="405" y="336">producto_id <tspan class="ek">FK</tspan></text>
+        <text class="ef" x="405" y="352">cantidad · grupo</text>
+        <text class="ef ef-dim" x="405" y="368">componente de un combo</text>
+
+        <!-- ============ pedidos ============ -->
+        <rect class="ent" x="30" y="430" width="200" height="96"/>
+        <rect class="band" x="30" y="430" width="200" height="24"/>
+        <text class="etitle" x="40" y="446">pedidos</text>
+        <text class="ef" x="40" y="470">id <tspan class="ek">PK</tspan></text>
+        <text class="ef" x="40" y="486">cliente_nombre · estado</text>
+        <text class="ef" x="40" y="502">total · tipo_entrega</text>
+        <text class="ef ef-dim" x="40" y="518">fecha · notas · pago</text>
+
+        <!-- ============ pedido_items ============ -->
+        <rect class="ent" x="395" y="430" width="240" height="96"/>
+        <rect class="band" x="395" y="430" width="240" height="24"/>
+        <text class="etitle" x="405" y="446">pedido_items</text>
+        <text class="ef" x="405" y="470">pedido_id <tspan class="ek">FK</tspan></text>
+        <text class="ef" x="405" y="486">producto_id <tspan class="ek">FK</tspan> <tspan class="ef-dim">NULL</tspan></text>
+        <text class="ef" x="405" y="502">nombre · precio_unitario</text>
+        <text class="ef ef-dim" x="405" y="518">(copias del momento — snapshot)</text>
+
+        <!-- ============ admin_users / local_config ============ -->
+        <rect class="ent" x="720" y="290" width="235" height="80"/>
+        <rect class="band" x="720" y="290" width="235" height="24"/>
+        <text class="etitle" x="730" y="306">admin_users</text>
+        <text class="ef" x="730" y="330">id <tspan class="ek">PK</tspan> · username <tspan class="ek">UQ</tspan></text>
+        <text class="ef" x="730" y="346">password_hash · nombre</text>
+        <text class="elabel" x="720" y="388">aislada — solo el login del dueño</text>
+
+        <rect class="ent" x="720" y="440" width="235" height="80"/>
+        <rect class="band" x="720" y="440" width="235" height="24"/>
+        <text class="etitle" x="730" y="456">local_config</text>
+        <text class="ef" x="730" y="480">id = 1 <tspan class="ef-dim">(única fila)</tspan></text>
+        <text class="ef" x="730" y="496">nombre · whatsapp · horarios</text>
+        <text class="elabel" x="720" y="540">singleton: UNA fila, la config del local</text>
+
+        <!-- ============ Relación: categorias → productos (sin FK) ============ -->
+        <line class="edge-dashed" x1="210" y1="148" x2="395" y2="148"/>
+        <text class="card-lab" x="222" y="142" text-anchor="middle">1</text>
+        <text class="card-lab" x="383" y="142" text-anchor="middle">N</text>
+        <text class="elabel" x="302" y="168" text-anchor="middle">match por NOMBRE — sin FK</text>
+
+        <!-- ============ Relación: productos → producto_imagenes ============ -->
+        <line class="edge" x1="635" y1="130" x2="720" y2="130"/>
+        <text class="card-lab" x="646" y="124" text-anchor="middle">1</text>
+        <text class="card-lab" x="709" y="124" text-anchor="middle">N</text>
+        <text class="elabel" x="677" y="152" text-anchor="middle">galería · cascade</text>
+
+        <!-- ============ Relación: productos → combo_items (combo_id) ============ -->
+        <line class="edge" x1="450" y1="172" x2="450" y2="280"/>
+        <text class="card-lab" x="459" y="190">1</text>
+        <text class="card-lab" x="459" y="274">N</text>
+        <text class="elabel" x="441" y="230" text-anchor="end">combo_id — es SU combo</text>
+
+        <!-- ============ Relación: productos → combo_items (producto_id) ============ -->
+        <line class="edge" x1="580" y1="172" x2="580" y2="280"/>
+        <text class="card-lab" x="589" y="190">1</text>
+        <text class="card-lab" x="589" y="274">N</text>
+        <text class="elabel" x="589" y="230">producto_id — es componente de</text>
+
+        <!-- ============ Relación: pedidos → pedido_items ============ -->
+        <line class="edge" x1="230" y1="478" x2="395" y2="478"/>
+        <text class="card-lab" x="241" y="472" text-anchor="middle">1</text>
+        <text class="card-lab" x="384" y="472" text-anchor="middle">N</text>
+        <text class="elabel" x="312" y="498" text-anchor="middle">líneas del pedido · cascade</text>
+
+        <!-- ============ Relación: pedido_items → productos (N:1, nullable) ============ -->
+        <polyline class="edge" points="635,500 690,500 690,140 635,140"/>
+        <text class="card-lab" x="647" y="134" text-anchor="end">1</text>
+        <text class="card-lab" x="647" y="494">N</text>
+        <text class="elabel" x="700" y="330">N:1 · FK nullable</text>
+        <text class="elabel" x="700" y="348">el nombre y el precio van</text>
+        <text class="elabel" x="700" y="366">copiados (snapshot)</text>
+      </svg>
+    </div>
+    <figcaption>
+      Diagrama entidad-relación completo. Cada caja amarilla es una tabla; las líneas
+      conectan las llaves foráneas con el <strong>1</strong> y el <strong>N</strong> en cada
+      extremo. <code>producto_imagenes</code> es la tabla nueva del soporte multi-imagen.
+    </figcaption>
+  </figure>
+
+  <div class="legend">
+    <span class="legend-item"><span class="k-swatch"></span> FK real (llave foránea)</span>
+    <span class="legend-item"><span class="k-swatch dashed"></span> relación lógica, sin FK</span>
+    <span class="legend-item"><span class="k-swatch bandmini"></span> tabla / entidad</span>
+  </div>
+
+  <!-- ==================== CÓMO LEER ==================== -->
+  <section>
+    <h2>Cómo leer las cardinalidades</h2>
+    <p class="sub">La base casi toda usa <strong>1 : N</strong> (uno a muchos), que es lo mismo
+    que <strong>N : 1</strong> visto desde el otro lado:</p>
+    <div class="decisions">
+      <div class="dec">
+        <h3>1 : N — uno a muchos</h3>
+        <p><strong>Un</strong> registro del lado del <code>1</code> puede estar relacionado con
+        <strong>N</strong> registros del otro lado. La FK vive del lado de la N. Ej: un pedido
+        tiene N líneas; cada línea pertenece a UN solo pedido.</p>
+      </div>
+      <div class="dec">
+        <h3>N : 1 — muchos a uno</h3>
+        <p>La misma relación vista al revés, desde la tabla que tiene la FK: cada línea de
+        pedido apunta a UN producto. Es la notación del diagrama cuando la flecha sale de la
+        tabla hija.</p>
+      </div>
+      <div class="dec">
+        <h3>1 : 1 — uno a uno</h3>
+        <p>Solo existe una vez: <code>local_config</code>, que tiene una única fila
+        (<code>id = 1</code>) con la configuración del local. Se fuerza por código (patrón
+        singleton), no por el esquema.</p>
+      </div>
+      <div class="dec">
+        <h3>¿Y las N : M?</h3>
+        <p>No hay ninguna directa. <code>combo_items</code> cumple ese papel entre
+        <code>productos</code> y <code>productos</code> (un combo ES un producto, y sus
+        componentes también son productos), pero modelada como dos FKs de
+        <strong>1 : N</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TABLA POR TABLA ==================== -->
+  <section>
+    <p class="eyebrow">Referencia</p>
+    <h2>Tabla por tabla, con todas sus columnas</h2>
+
+    <div class="tables">
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">productos <span class="tag tag-pk">15+2 cols</span></span>
+          <p class="trole">Lo que se vende: barritas, bebidas… y también los COMBOS
+          (categoria="combo"). Es la tabla central: 4 tablas apuntan a ella o salen de ella.</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span> identificador único</span></li>
+          <li><span class="cname">nombre</span><span class="ctype">VARCHAR(120)</span><span class="cnote">NOT NULL</span></li>
+          <li><span class="cname">descripcion</span><span class="ctype">TEXT</span><span class="cnote">opcional, la ve el detalle</span></li>
+          <li><span class="cname">precio</span><span class="ctype">NUMERIC(10,2)</span><span class="cnote">NOT NULL</span></li>
+          <li><span class="cname">precio_oferta</span><span class="ctype">NUMERIC(10,2)</span><span class="cnote">NULL = no hay oferta</span></li>
+          <li><span class="cname">en_oferta</span><span class="ctype">BOOLEAN</span><span class="cnote">aparece en la sección Ofertas</span></li>
+          <li><span class="cname">stock</span><span class="ctype">INTEGER</span><span class="cnote">en combos: se calcula de los componentes</span></li>
+          <li><span class="cname">categoria</span><span class="ctype">VARCHAR(40)</span><span class="cnote">TEXTO, matchea categorias.nombre (sin FK)</span></li>
+          <li><span class="cname">imagen_url</span><span class="ctype">VARCHAR(255)</span><span class="cnote">la foto PRINCIPAL (denormalizada)</span></li>
+          <li><span class="cname">disponible</span><span class="ctype">BOOLEAN</span><span class="cnote">true si stock &gt; 0</span></li>
+          <li><span class="cname">mostrar_sin_stock</span><span class="ctype">BOOLEAN</span><span class="cnote">"alarma": si está en false, se oculta al cliente con stock 0</span></li>
+          <li><span class="cname">orden</span><span class="ctype">INTEGER</span><span class="cnote">menor = aparece primero</span></li>
+          <li><span class="cname">etiqueta</span><span class="ctype">VARCHAR(60)</span><span class="cnote">badge libre (ej: "🍻 Día del Amigo")</span></li>
+          <li><span class="cname">activo</span><span class="ctype">BOOLEAN</span><span class="cnote">interruptor de visibilidad (combos)</span></li>
+          <li><span class="cname">created_at / updated_at</span><span class="ctype">DATETIME</span><span class="cnote">audit Trail automático</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">producto_imagenes <span class="tag tag-new">NUEVA</span></span>
+          <p class="trole">La galería: TODAS las fotos de un producto. La principal vive además
+          copiada en productos.imagen_url (la leen las cards, el carrusel y el carrito).</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span></span></li>
+          <li><span class="cname">producto_id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-fk">FK</span> → productos.id · CASCADE</span></li>
+          <li><span class="cname">url</span><span class="ctype">VARCHAR(255)</span><span class="cnote">"/uploads/&lt;archivo&gt;"</span></li>
+          <li><span class="cname">orden</span><span class="ctype">INTEGER</span><span class="cnote">menor = primero en la galería</span></li>
+          <li><span class="cname">created_at</span><span class="ctype">DATETIME</span><span class="cnote">cuándo se subió</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">combo_items</span>
+          <p class="trole">Tabla intermedia: "este combo lleva N unidades del producto X".
+          Sus DOS FKs apuntan a productos (el combo y el componente).</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span></span></li>
+          <li><span class="cname">combo_id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-fk">FK</span> → productos.id · CASCADE</span></li>
+          <li><span class="cname">producto_id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-fk">FK</span> → productos.id</span></li>
+          <li><span class="cname">cantidad</span><span class="ctype">INTEGER</span><span class="cnote">siempre &gt; 0 (lo valida el router)</span></li>
+          <li><span class="cname">grupo</span><span class="ctype">VARCHAR(40)</span><span class="cnote">NULL = fijo · mismo label = opciones a elección</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">pedidos</span>
+          <p class="trole">Un pedido enviado por WhatsApp. Arranca "pendiente" y el dueño lo
+          confirma o cancela. Sus líneas viven en pedido_items.</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span></span></li>
+          <li><span class="cname">cliente_nombre</span><span class="ctype">VARCHAR(120)</span><span class="cnote">el local que pide (modelo B2B)</span></li>
+          <li><span class="cname">telefono</span><span class="ctype">VARCHAR(30)</span><span class="cnote">opcional — el contacto real es WhatsApp</span></li>
+          <li><span class="cname">tipo_entrega</span><span class="ctype">VARCHAR(20)</span><span class="cnote">takeaway / delivery</span></li>
+          <li><span class="cname">direccion</span><span class="ctype">VARCHAR(200)</span><span class="cnote">solo para delivery</span></li>
+          <li><span class="cname">metodo_pago</span><span class="ctype">VARCHAR(30)</span><span class="cnote">efectivo / mercado_pago (se cobra aparte)</span></li>
+          <li><span class="cname">notas</span><span class="ctype">TEXT</span><span class="cnote">comentarios del cliente</span></li>
+          <li><span class="cname">total</span><span class="ctype">NUMERIC(10,2)</span><span class="cnote">de referencia, editable por el dueño</span></li>
+          <li><span class="cname">estado</span><span class="ctype">VARCHAR(20)</span><span class="cnote">pendiente / confirmada / cancelada</span></li>
+          <li><span class="cname">created_at · confirmada_at</span><span class="ctype">DATETIME</span><span class="cnote">cuándo se pidió / se confirmó</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">pedido_items</span>
+          <p class="trole">Cada línea de un pedido. La tabla más "peculiar": guarda COPIAS
+          (snapshot) del nombre y precio del producto del momento del pedido.</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span></span></li>
+          <li><span class="cname">pedido_id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-fk">FK</span> → pedidos.id · CASCADE</span></li>
+          <li><span class="cname">producto_id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-fk">FK</span> → productos.id · <strong>NULLABLE</strong></span></li>
+          <li><span class="cname">nombre</span><span class="ctype">VARCHAR(120)</span><span class="cnote">SNAPSHOT — copia, no join</span></li>
+          <li><span class="cname">cantidad</span><span class="ctype">INTEGER</span><span class="cnote">unidades pedidas</span></li>
+          <li><span class="cname">precio_unitario</span><span class="ctype">NUMERIC(10,2)</span><span class="cnote">SNAPSHOT — lo que se cobró ESE día</span></li>
+          <li><span class="cname">elecciones</span><span class="ctype">TEXT</span><span class="cnote">JSON de las opciones del combo ("Bebida: Coca")</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">categorias</span>
+          <p class="trole">Las secciones del menú (Barritas, Proteicas, Bebidas…), editables
+          por el dueño. "combo" es un nombre RESERVADO que nunca aparece acá.</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span></span></li>
+          <li><span class="cname">nombre</span><span class="ctype">VARCHAR(40)</span><span class="cnote">UQ — matchea Producto.categoria POR TEXTO</span></li>
+          <li><span class="cname">orden</span><span class="ctype">INTEGER</span><span class="cnote">menor = la sección aparece antes</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">admin_users</span>
+          <p class="trole">El login del dueño. No se relaciona con nada: el sistema no tiene
+          usuarios clientes. La password NUNCA se guarda en claro.</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span></span></li>
+          <li><span class="cname">username</span><span class="ctype">VARCHAR(60)</span><span class="cnote">UQ, índice</span></li>
+          <li><span class="cname">password_hash</span><span class="ctype">VARCHAR(255)</span><span class="cnote">bcrypt</span></li>
+          <li><span class="cname">nombre</span><span class="ctype">VARCHAR(120)</span><span class="cnote">de display</span></li>
+        </ul>
+      </div>
+
+      <div class="tbl">
+        <div class="tbl-head">
+          <span class="tname">local_config</span>
+          <p class="trole">Singleton: SIEMPRE una sola fila (id = 1) con la configuración del
+          local. El GET público devuelve defaults si la fila todavía no existe.</p>
+        </div>
+        <ul class="cols">
+          <li><span class="cname">id</span><span class="ctype">INTEGER</span><span class="cnote"><span class="tag tag-pk">PK</span> siempre 1 — UNA fila</span></li>
+          <li><span class="cname">nombre</span><span class="ctype">VARCHAR(120)</span><span class="cnote">el del Navbar (plantilla: cambia por cliente)</span></li>
+          <li><span class="cname">direccion · telefono</span><span class="ctype">VARCHAR</span><span class="cnote">los ve el Footer y /contacto</span></li>
+          <li><span class="cname">whatsapp</span><span class="ctype">VARCHAR(30)</span><span class="cnote">formato internacional sin + (ej: 5491100000000)</span></li>
+          <li><span class="cname">radio_delivery_km</span><span class="ctype">INTEGER</span><span class="cnote">0 = delivery deshabilitado</span></li>
+          <li><span class="cname">horarios · descripcion</span><span class="ctype">VARCHAR / TEXT</span><span class="cnote">informativos, los edita el dueño</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== RELACIONES ==================== -->
+  <section>
+    <p class="eyebrow">Relaciones</p>
+    <h2>Cada flecha del diagrama, explicada</h2>
+
+    <div class="rel">
+      <div class="rel-line">
+        <span class="rt">productos</span>
+        <span class="rmark">1 ─── N</span>
+        <span class="rt">producto_imagenes</span>
+      </div>
+      <p><strong>FK:</strong> <code>producto_imagenes.producto_id</code>. Un producto tiene
+      muchas fotos; cada foto pertenece a un producto. Borrar el producto borra sus fotos
+      (<strong>cascade</strong>). La foto principal vive ADEMÁS copiada en
+      <code>productos.imagen_url</code> — la galería es la fuente de verdad, imagen_url es la "tapa".</p>
+    </div>
+
+    <div class="rel">
+      <div class="rel-line">
+        <span class="rt">productos</span>
+        <span class="rmark">1 ─── N</span>
+        <span class="rt">combo_items</span>
+        <span class="rmark" style="letter-spacing:0; font-weight:400; color:var(--muted);">× 2 FKs</span>
+      </div>
+      <p>La relación más rara del diagrama: <strong>combo_items tiene DOS FKs hacia
+      productos</strong>. Por <code>combo_id</code>: un combo tiene N componentes (cascade al
+      borrar el combo). Por <code>producto_id</code>: un producto simple puede entrar como
+      componente en N combos. El campo <code>grupo</code> convierte varias filas en opciones a
+      elección del cliente ("Bebida": Coca / Agua / Fanta).</p>
+    </div>
+
+    <div class="rel">
+      <div class="rel-line">
+        <span class="rt">pedidos</span>
+        <span class="rmark">1 ─── N</span>
+        <span class="rt">pedido_items</span>
+      </div>
+      <p><strong>FK:</strong> <code>pedido_items.pedido_id</code>. Un pedido tiene muchas
+      líneas; una línea sin pedido no tiene sentido, por eso el cascade: borrar el pedido
+      borra sus líneas (no quedan huérfanas).</p>
+    </div>
+
+    <div class="rel">
+      <div class="rel-line">
+        <span class="rt">pedido_items</span>
+        <span class="rmark">N ─── 1</span>
+        <span class="rt">productos</span>
+      </div>
+      <p>La misma flecha anterior vista al revés: cada línea APUNTA a un producto, pero la
+      FK es <strong>nullable</strong>. ¿Por qué? Porque <code>nombre</code> y
+      <code>precio_unitario</code> son COPIAS del momento del pedido: si mañana el dueño cambia
+      el precio o borra el producto, el pedido histórico sigue mostrando lo que se cobró ese
+      día. NULL = el producto se borró, o es un ítem "Otro" que el dueño agregó a mano.</p>
+    </div>
+
+    <div class="rel">
+      <div class="rel-line">
+        <span class="rt">categorias</span>
+        <span class="rmark">1 ─── N</span>
+        <span class="rt">productos</span>
+        <span class="rmark" style="letter-spacing:0; font-weight:400; color:var(--muted);">sin FK (línea punteada)</span>
+      </div>
+      <p><strong>La única relación "romántica" del esquema:</strong> no hay llave foránea.
+      <code>productos.categoria</code> guarda el NOMBRE de la categoría como texto y el match
+      se hace comparando strings. SQLite no soporta agregar constraints a una tabla existente
+      (ALTER TABLE ADD CONSTRAINT no existe), y el patrón de micromigraciones del proyecto solo
+      permite ADD COLUMN. Los renombres los maneja el backend en cascada.</p>
+    </div>
+
+    <div class="rel">
+      <div class="rel-line">
+        <span class="rt">local_config</span>
+        <span class="rmark">1 ─── 1</span>
+        <span class="rmark" style="letter-spacing:0; font-weight:400; color:var(--muted);">una sola fila</span>
+      </div>
+      <p>El único <strong>1 : 1</strong> del esquema, y es artificial: la tabla siempre tiene
+      una fila con <code>id = 1</code> (patrón singleton). No necesita FKs porque no apunta a
+      nada ni nada la apunta.</p>
+    </div>
+  </section>
+
+  <!-- ==================== DECISIONES ==================== -->
+  <section>
+    <p class="eyebrow">El porqué</p>
+    <h2>Decisiones de diseño que conviene tener presentes</h2>
+    <div class="decisions">
+      <div class="dec">
+        <h3>El snapshot en pedido_items</h3>
+        <p>Los pedidos son registros históricos: deben sobrevivir a cambios de precio y a
+        productos borrados. Por eso las líneas guardan su propia copia y la FK es nullable.
+        Sin esto, "lo más vendido" se rompería al borrar un producto.</p>
+      </div>
+      <div class="dec">
+        <h3>Un combo ES un producto</h3>
+        <p>No hay tabla "combos": es una fila en productos con
+        <code>categoria="combo"</code>. Su stock no es una columna que se edite: el backend
+        calcula cuántos se pueden armar con el stock de los componentes (el mínimo de
+        stock ÷ cantidad de cada uno).</p>
+      </div>
+      <div class="dec">
+        <h3>imagen_url denormalizada</h3>
+        <p>La foto principal está en dos lugares: la fila 0 de la galería y la columna
+        <code>imagen_url</code>. Es a propósito — cards, carrusel y el carrito guardado en el
+        navegador ya leen esa columna; obligarlos a mirar la tabla sería tocar todo sin sumar
+        nada.</p>
+      </div>
+      <div class="dec">
+        <h3>Reglas de negocio SOLO en el backend</h3>
+        <p>Ninguna tabla guarda precios que manda el cliente: al pedir, el backend toma el
+        precio del catálogo y hace el snapshot. Para la visión de plantilla multi-cliente esto
+        importa: cada despliegue tiene su propia DB, y la integridad vive en un solo lugar.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="card-note">Fuente de verdad: <code>backend/app/models.py</code> (SQLAlchemy genera
+  el CREATE TABLE con <code>app/init_db.py</code>). Los cambios de esquema se aplican con el
+  patrón de micromigraciones (ADD COLUMN idempotente) y las tablas nuevas las crea
+  <code>create_all()</code>.</p>
+</main>
