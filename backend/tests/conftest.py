@@ -123,3 +123,46 @@ def crear_producto(cliente, admin_headers):
         return resp.json()
 
     return _crear
+
+
+@pytest.fixture()
+def combo_armado(cliente, admin_headers, crear_producto):
+    """Combo de test: 6 empanadas a elección (carne/queso) + 1 bebida a
+    elección (coca/agua) + un postre FIJO. Los stocks están elegidos para
+    que el cuello de botella sea un componente distinto por caso.
+
+    Stock efectivo esperado (regla de _stock_combo_efectivo):
+      - Empanada (N=6, grupo): total 30 + 10 = 40 -> 40 // 6 = 6
+        (las unidades de TODAS las opciones del grupo se SUMAN)
+      - Bebida (N=1, grupo): total 5 + 20 = 25 -> 25 // 1 = 25
+      - Postre fijo: 4 // 1 = 4  <- cuello de botella del combo
+    """
+    carne = crear_producto(nombre="Carne", stock=30, precio=500)
+    queso = crear_producto(nombre="Queso", stock=10, precio=500)
+    coca = crear_producto(nombre="Coca 1.5L", stock=5, precio=1200)
+    agua = crear_producto(nombre="Agua", stock=20, precio=800)
+    postre = crear_producto(nombre="Flan", stock=4, precio=900)
+    resp = cliente.post(
+        "/api/combos",
+        json={
+            "nombre": "Combo test",
+            "precio": 3500,
+            "items": [
+                {"producto_id": carne["id"], "cantidad": 6, "grupo": "Empanada"},
+                {"producto_id": queso["id"], "cantidad": 6, "grupo": "Empanada"},
+                {"producto_id": coca["id"], "cantidad": 1, "grupo": "Bebida"},
+                {"producto_id": agua["id"], "cantidad": 1, "grupo": "Bebida"},
+                {"producto_id": postre["id"], "cantidad": 1},
+            ],
+        },
+        headers=admin_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    return {
+        "combo": resp.json(),
+        "carne": carne["id"],
+        "queso": queso["id"],
+        "coca": coca["id"],
+        "agua": agua["id"],
+        "postre": postre["id"],
+    }
