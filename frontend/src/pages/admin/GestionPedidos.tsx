@@ -98,7 +98,12 @@ interface ItemEdit {
   key: number;
   producto_id: number | null;
   nombre: string;
-  precio: number; // en productos es informativo (el backend lo recalcula); en "Otro" lo edita el dueño
+  precio: number | ""; // en "Otro" lo edita el dueño; en catálogo, solo si NEGOCIA
+  // Precio con el que el item llegó en el pedido (snapshot). Al guardar:
+  // si `precio` sigue igual NO se manda precio_unitario y el backend
+  // refresca el precio vigente del catálogo (como siempre); si cambió,
+  // viaja y pisa SOLO este pedido (negociación por WhatsApp).
+  precioOriginal: number;
   // "" mientras el dueño borra el número para retipearlo; guardar exige >= 1
   // (una fila en 0 o vacía se entiende como "quitarla", igual que antes).
   cantidad: number | "";
@@ -114,6 +119,15 @@ interface ItemEdit {
 const leerCantidad = (v: string): number | "" => {
   if (v === "") return "";
   const n = parseInt(v);
+  return isNaN(n) ? "" : n;
+};
+
+// Igual que leerCantidad pero para el precio: si el dueño borra el número
+// para retipearlo, el campo queda VACÍO (no se rellena con 0, que era lo
+// que pegaba el número nuevo atrás del cero: "0" + "15000" = "015000").
+const leerPrecio = (v: string): number | "" => {
+  if (v === "") return "";
+  const n = parseFloat(v);
   return isNaN(n) ? "" : n;
 };
 
@@ -155,6 +169,7 @@ function PedidoCard({
           producto_id: it.producto_id,
           nombre: it.nombre,
           precio: it.precio_unitario,
+          precioOriginal: it.precio_unitario,
           cantidad: it.cantidad,
           elecciones: it.elecciones ?? null,
         }))
@@ -165,9 +180,12 @@ function PedidoCard({
   }, [editando, pedido.items, pedido.metodo_pago]);
 
   // Total "en vivo" del editor (el definitivo lo recalcula el backend).
-  // Cantidad vacía ("") aporta 0 hasta que se complete.
+  // Cantidad o precio vacíos ("") aportan 0 hasta que se completen.
   const totalEdicion = itemsEdit.reduce(
-    (s, f) => s + (typeof f.cantidad === "number" ? f.cantidad : 0) * f.precio,
+    (s, f) =>
+      s +
+      (typeof f.cantidad === "number" ? f.cantidad : 0) *
+        (typeof f.precio === "number" ? f.precio : 0),
     0
   );
 
@@ -175,7 +193,7 @@ function PedidoCard({
     setErrorEdicion(null);
     setItemsEdit((filas) => [
       ...filas,
-      { key: -Date.now(), producto_id: null, nombre: "", precio: 0, cantidad: 1 },
+      { key: -Date.now(), producto_id: null, nombre: "", precio: "", precioOriginal: 0, cantidad: 1 },
     ]);
   }
 
@@ -188,9 +206,19 @@ function PedidoCard({
       (f): f is ItemEdit & { cantidad: number } =>
         typeof f.cantidad === "number" && f.cantidad > 0
     );
-    const otraInvalida = filas.some((f) => !f.producto_id && (!f.nombre.trim() || f.precio < 0));
+    // Precio vacío ("") = edición de precio a medias. En "Otro" es inválido
+    // (necesita precio); en catálogo se interpreta como "no lo cambió" (no
+    // viaja precio_unitario y el backend refresca el vigente), así un
+    // guardado apurado no congela un precio que el dueño ni escribió.
+    const otraInvalida = filas.some(
+      (f) => !f.producto_id && (!f.nombre.trim() || f.precio === "" || f.precio < 0)
+    );
     if (otraInvalida) {
       setErrorEdicion('Cada ítem "Otro" necesita nombre y precio (el precio puede ser 0).');
+      return;
+    }
+    if (filas.some((f) => f.producto_id && typeof f.precio === "number" && f.precio < 0)) {
+      setErrorEdicion("El precio negociado no puede ser negativo.");
       return;
     }
     if (filas.length === 0) {
@@ -201,8 +229,24 @@ function PedidoCard({
       pedido,
       filas.map((f) =>
         f.producto_id
-          ? { producto_id: f.producto_id, cantidad: f.cantidad, elecciones: f.elecciones ?? null }
-          : { nombre: f.nombre.trim(), precio_unitario: f.precio, cantidad: f.cantidad }
+          ? {
+              producto_id: f.producto_id,
+              cantidad: f.cantidad,
+              elecciones: f.elecciones ?? null,
+              // Precio NEGOCIADO: solo viaja si el dueño lo cambió (y lo
+              // completó). Si no, el backend vuelve a snapshotear el precio
+              // VIGENTE (por si el catálogo cambió desde que el cliente pidió).
+              ...(typeof f.precio === "number" && f.precio !== f.precioOriginal
+                ? { precio_unitario: f.precio }
+                : {}),
+            }
+          // La validación de arriba ya rechazó los "Otro" con precio vacío;
+          // el 0 solo satisface al compilador, nunca se ejecuta.
+          : {
+              nombre: f.nombre.trim(),
+              precio_unitario: typeof f.precio === "number" ? f.precio : 0,
+              cantidad: f.cantidad,
+            }
       ),
       metodoPagoEdit
     );
@@ -244,14 +288,50 @@ function PedidoCard({
           {itemsEdit.map((f) => (
             <li key={f.key} className="flex items-center gap-2">
               {f.producto_id ? (
-                // Producto del catálogo: solo se edita cantidad. El precio
-                // vigente lo vuelve a tomar el backend al guardar.
+                // Producto del catálogo: se edita cantidad y, si el dueño
+                // NEGOCIÓ otro precio por WhatsApp, también el precio (pisará
+                // el snapshot SOLO de este pedido; el catálogo queda intacto).
                 <>
                   <span className="flex-1 min-w-0">
                     {f.nombre}{" "}
-                    <span className="text-gray-400">
-                      (${f.precio.toLocaleString("es-AR")} c/u)
+                    {/* Precio por unidad editable. Resaltado cuando difiere
+                        del original; ↺ lo restaura. Si se deja igual, al
+                        guardar el backend refresca el precio vigente. */}
+                    <span className="inline-flex items-center gap-0.5">
+                      <span
+                        className={`text-xs ${
+                          f.precio !== f.precioOriginal ? "text-marca font-bold" : "text-gray-400"
+                        }`}
+                      >
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        className={`border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-20 ${
+                          typeof f.precio === "number" && f.precio !== f.precioOriginal ? "border-marca" : ""
+                        }`}
+                        value={f.precio}
+                        placeholder="0"
+                        onChange={(e) =>
+                          editarFila(f.key, (x) => ({ ...x, precio: leerPrecio(e.target.value) }))
+                        }
+                        aria-label={`Precio unitario de ${f.nombre}`}
+                      />
+                      {typeof f.precio === "number" && f.precio !== f.precioOriginal && (
+                        <button
+                          onClick={() =>
+                            editarFila(f.key, (x) => ({ ...x, precio: x.precioOriginal }))
+                          }
+                          className="text-gray-400 hover:text-gray-200 text-xs"
+                          title="Restaurar precio del pedido"
+                        >
+                          ↺
+                        </button>
+                      )}
                     </span>
+                    {" "}c/u
                     {/* Las elecciones del cliente se conservan (no se editan
                         acá): cambiar qué bebida pidió el cliente es rehacer
                         el pedido, no corregirlo. */}
@@ -273,7 +353,8 @@ function PedidoCard({
                     aria-label={`Cantidad de ${f.nombre}`}
                   />
                   <span className="w-20 text-right">
-                    ${((typeof f.cantidad === "number" ? f.cantidad : 0) * f.precio).toLocaleString("es-AR")}
+                    ${((typeof f.cantidad === "number" ? f.cantidad : 0) *
+                      (typeof f.precio === "number" ? f.precio : 0)).toLocaleString("es-AR")}
                   </span>
                   <button
                     onClick={() => setItemsEdit((fs) => fs.filter((x) => x.key !== f.key))}
@@ -299,7 +380,8 @@ function PedidoCard({
                       step="1"
                       className="border-negro-borde bg-negro text-gray-100 rounded px-1 py-0.5 w-20 pl-4"
                       value={f.precio}
-                      onChange={(e) => editarFila(f.key, (x) => ({ ...x, precio: parseFloat(e.target.value) || 0 }))}
+                      placeholder="0"
+                      onChange={(e) => editarFila(f.key, (x) => ({ ...x, precio: leerPrecio(e.target.value) }))}
                       aria-label="Precio del extra"
                     />
                   </div>
@@ -312,7 +394,8 @@ function PedidoCard({
                     aria-label="Cantidad del extra"
                   />
                   <span className="w-20 text-right">
-                    ${((typeof f.cantidad === "number" ? f.cantidad : 0) * f.precio).toLocaleString("es-AR")}
+                    ${((typeof f.cantidad === "number" ? f.cantidad : 0) *
+                      (typeof f.precio === "number" ? f.precio : 0)).toLocaleString("es-AR")}
                   </span>
                   <button
                     onClick={() => setItemsEdit((fs) => fs.filter((x) => x.key !== f.key))}
