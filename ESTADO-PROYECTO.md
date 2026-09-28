@@ -1,14 +1,83 @@
 # Pizzería El Gordito — Estado del proyecto
 
-> Block de notas / resumen del proyecto. Última actualización: 2026-08-25.
+> Block de notas / resumen del proyecto. Última actualización: 2026-09-28.
 > Repo: https://github.com/AlePiris/El-Gordito (rama `main`)
+> Ubicación local (PC de Ale): C:\Users\ale_p\OneDrive\Escritorio\El-Gordito
+> (antes estaba en C:\PP4 — mismo repo, otra carpeta)
 
 ## Qué es
 Web para pizzería que **no cobra online**. El carrito arma un mensaje de WhatsApp
 con el pedido + total + detalles; el dueño confirma la compra desde un dashboard;
 solo los pedidos **confirmados** alimentan el análisis "lo más vendido".
 
-Trabajo integrador Frontend + Backend de la facultad.
+Trabajo integrador Frontend + Backend de la facultad. **Destino real: catálogo
+de un proveedor** (un compañero de Ale que hoy manda un PDF con su oferta por
+WhatsApp; la web lo reemplaza). Tráfico muy bajo. El "pizzería" de los nombres
+es histórico — el branding real se configura desde Ajustes (`LocalConfig`),
+así que NO hace falta reescribir código para rebrandear.
+
+---
+
+## Sesión 2026-09-27/28 — deploy + credenciales (decisiones y POR QUÉ)
+
+> Detalle completo del diseño en
+> `docs/superpowers/specs/2026-09-27-deploy-produccion-design.md`.
+> Estado al cerrar la sesión: **especificado y aprobado, SIN implementar todavía**.
+> Verificado en verde: 31 tests backend, `tsc && vite build` frontend, git
+> sincronizado con `origin/main`.
+
+1. **Hosting: Vercel (front estático + back serverless) + Neon (Postgres) +
+   Vercel Blob (imágenes)**, todo free.
+   - Por qué Vercel y no Render/Koyeb free: estos duermen tras ~15 min sin
+     visitas → el primer cliente espera 30-60s. El dueño manda el link por
+     WhatsApp: mala primera impresión. Serverless solo tiene cold start ~1s.
+   - Caveat asumido: Vercel Hobby = "no comercial" en ToS. Para el catálogo de
+     un compañero con tráfico ínfimo, riesgo aceptado. Si crece: migrar sin
+     tocar código (o Vercel Pro $20/mes).
+   - Por qué Neon: Postgres serverless real, 0.5 GB free, auto-suspend. Ya
+     soportado: `database.py` usa NullPool (serverless-safe).
+   - Cómo entra el back: Vercel detecta FastAPI zero-config en `app/main.py`.
+     Solo un `vercel.json` chico para excluir `tests/` del bundle.
+2. **Imágenes → Vercel Blob** (bloqueante del deploy): serverless NO persiste
+   disco; hoy se guardan en `backend/uploads/` y las sirve StaticFiles. Diseño:
+   helper `guardar_archivo()` con switch por entorno — sin
+   `BLOB_READ_WRITE_TOKEN` escribe a disco como hoy (dev y los 31 tests no se
+   tocan); con token sube por HTTP a la API REST de Blob y devuelve URL
+   absoluta que se guarda en la DB (el resto del código ya consume la URL tal
+   cual, no cambia). Prod arranca con DB nueva (seed contra Neon): NO hay que
+   migrar imágenes viejas.
+3. **Credenciales del dueño, SIN hardcodeo.** Problema encontrado: el seed
+   crea `admin`/`admin123` hardcodeados y NO existía forma de cambiar la
+   password (ni endpoint ni pantalla). Decidido:
+   - Seed lee `ADMIN_USERNAME` / `ADMIN_PASSWORD` de env vars (REQUERIDAS: si
+     falta alguna, error claro). La unicidad del username la garantiza la DB
+     (`unique=True`), no el código. Los tests no dependen del seed (crean su
+     propio admin en `conftest.py`).
+   - `PUT /api/auth/password`: cambiar la password logueado (pide actual +
+     nueva), form en Ajustes. Así el dueño pasa de la password inicial a la
+     suya desde el dashboard.
+   - **"Olvidé mi contraseña"**: email con link de restablecimiento a
+     `RECOVERY_EMAILS` (mail del dueño + mail de Ale, fijos — no se pide email
+     en el form). Tabla `password_resets` (hash SHA-256 del token, expira 30
+     min, de un solo uso). Envío por SMTP (recomendado: Gmail app-password
+     con 2FA; alternativa Brevo cambiando `SMTP_HOST`, mismo código).
+4. **Limpieza de UI para producción**:
+   - Sacar la línea "Demo: admin / admin123" del login (quedaría pegada en la
+     web pública).
+   - Placeholder del input "Otro" del editor de pedidos → vacío (decía
+     "Nombre del extra (ej. 'bacon extra')").
+5. **Modales propios** (detectado en la revisión del 09-28): los `confirm()` /
+   `prompt()` nativos muestran "localhost:5173 dice:" (en prod diría la URL de
+   Vercel). Diseño: `components/Modal.tsx` con ConfirmModal (los 5 confirm:
+   borrar producto/categoría/combo/foto, cancelar pedido) y ModalInput con
+   campo prellenado (los 2 prompt: precio de oferta, renombrar categoría).
+   Esc o click afuera = cancelar, Enter = confirmar, estética del tema.
+
+**Cómo funciona hoy el login** (contexto para entender el punto 3): no hay
+registro de usuarios; la única cuenta la crea el seed. El password se guarda
+solo como hash bcrypt; el login devuelve un JWT firmado con `JWT_SECRET`
+(vence a las 8 hs) que viaja como `Authorization: Bearer` y valida
+`require_admin` en cada endpoint admin.
 
 ---
 
@@ -19,15 +88,17 @@ Necesitás **dos terminales**. Los `.env` ya están creados (`backend/.env` y
 
 **Terminal 1 — Backend (puerto 8800):**
 ```powershell
-cd C:\PP4\backend
+cd C:\Users\ale_p\OneDrive\Escritorio\El-Gordito\backend
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8800 --reload
 ```
 > Si borraste la base o es la primera vez, antes corré una sola vez:
-> `.\.venv\Scripts\python.exe -m app.init_db` y `...\-m app.seed`
+> `.\.venv\Scripts\python.exe -m app.init_db` y `.\.venv\Scripts\python.exe -m app.seed`
+> (con `backend/.env` apuntando a SQLite local — ese archivo NO está en git,
+> recrealo desde `.env.example` si clonaste en otra PC).
 
 **Terminal 2 — Frontend (puerto 5173):**
 ```powershell
-cd C:\PP4\frontend
+cd C:\Users\ale_p\OneDrive\Escritorio\El-Gordito\frontend
 npm run dev
 ```
 
@@ -114,18 +185,26 @@ de combos y ciclo de vida de pedidos. Diseño:
 
 ---
 
-## Deploy (Vercel + Neon, gratuito) — pendiente de hacer
+## Deploy (Vercel + Neon, gratuito) — diseño aprobado, pendiente de ejecutar
 
-- **Backend**: proyecto Vercel, Root Directory = `backend/`. Vercel detecta FastAPI
-  zero-config (`app/main:app`). Env vars: `DATABASE_URL` (Neon), `JWT_SECRET`, `CORS_ORIGINS`.
-- **Frontend**: proyecto Vercel, Root Directory = `frontend/`. Env vars: `VITE_API_URL`
-  (URL del backend), `VITE_WA_NUMBER`.
-- **DB**: Neon (Postgres serverless, free). Correr `init_db`/`seed` local contra Neon.
-- **Imágenes en prod**: el disco serverless no persiste → migrar `/imagen` a **Vercel Blob**
-  (`@vercel/blob`), que devuelve una URL absoluta a guardar en `imagen_url`.
+Estrategia final y razones: ver sección "Sesión 2026-09-27/28" arriba y la
+spec completa en `docs/superpowers/specs/2026-09-27-deploy-produccion-design.md`
+(env vars por tabla, pasos en orden, riesgos con mitigaciones, testing).
 
-Límites free (Vercel Hobby + Neon Free) verificados 2026-08-25: alcanzan con holgura
-para una pizzería. Hobby = solo uso personal/no-comercial (OK para facultad).
+Resumen operativo:
+- **Backend**: proyecto Vercel, Root Directory = `backend/` (detecta FastAPI
+  zero-config). Env vars: `DATABASE_URL` (Neon pooled), `JWT_SECRET`,
+  `CORS_ORIGINS`, `BLOB_READ_WRITE_TOKEN`, `FRONTEND_URL`, `RECOVERY_EMAILS`,
+  `SMTP_*`, `EMAIL_FROM`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+- **Frontend**: proyecto Vercel, Root Directory = `frontend/`. Env vars:
+  `VITE_API_URL` (URL del backend; horneada en el build, cambiar = redeploy),
+  `VITE_WA_NUMBER` (fallback; el real lo setea el dueño en Ajustes).
+- **DB**: Neon free. `init_db` + `seed` corren UNA VEZ desde la PC local
+  apuntando a la cadena de Neon, con las `ADMIN_*` de producción.
+- **Imágenes**: Vercel Blob (1 GB free) vía su API REST desde Python.
+
+Límites free (Vercel Hobby + Neon + Blob) verificados 2026-09-27: alcanzan
+con holgura para el tráfico esperado.
 
 ---
 

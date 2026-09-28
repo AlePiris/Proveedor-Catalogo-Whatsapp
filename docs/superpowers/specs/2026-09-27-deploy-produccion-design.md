@@ -169,7 +169,16 @@ código. Los tests mockean este módulo: nunca envían emails de verdad.
    credenciales quedan en docs privadas, no en la web pública).
 2. `GestionPedidos.tsx`: placeholder del input "Otro" → vacío.
 3. Agregar el link "Olvidé mi contraseña" y las 2 páginas nuevas (4c).
-4. Actualizar `ESTADO-PROYECTO.md` y `README.md`: estado real (proveedor,
+4. **Modales propios** (agregado en la revisión del 2026-09-28): reemplazar
+   los 7 `confirm()`/`prompt()` nativos (muestran "localhost:5173 dice:", y en
+   prod mostrarían la URL de Vercel) por `components/Modal.tsx`:
+   - `ConfirmModal` (título, mensaje, Cancelar/Confirmar — rojo en destructivas):
+     borrar producto, borrar categoría, borrar combo, borrar foto, cancelar pedido.
+   - `ModalInput` (campo prellenado, mismas validaciones): precio de oferta,
+     renombrar categoría.
+   - Esc o click fuera cierra (= cancelar), Enter confirma, estética del tema
+     (`bg-negro-panel`, etc.). Las páginas guardan en state qué diálogo está abierto.
+5. Actualizar `ESTADO-PROYECTO.md` y `README.md`: estado real (proveedor,
    combos, categorías, galería, tests, deploy).
 
 ## 6. Pasos de deploy (orden)
