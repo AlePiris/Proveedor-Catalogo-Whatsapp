@@ -28,11 +28,10 @@ from app.database import get_db
 from app.models import LocalConfig
 from app.schemas import ConfigOut, ConfigUpdate
 
-# UPLOAD_DIR vive en el router de productos y es quien sirve /uploads. Lo
-# leemos en tiempo de REQUEST (atributo del módulo, no from-import) para que
-# el fixture uploads_dir de los tests —que parchea app.routers.productos.
-# UPLOAD_DIR— siga aislando también estos endpoints.
-from app.routers import productos as router_productos
+# El guardado/borrado físico pasa por el helper ÚNICO de app/storage.py (disco
+# en dev, Vercel Blob en prod). Se usa en tiempo de REQUEST, sin from-import del
+# UPLOAD_DIR: el fixture uploads_dir de los tests parchea app.storage.UPLOAD_DIR.
+from app.storage import guardar_archivo, borrar_archivo
 
 router = APIRouter(tags=["config"])
 
@@ -91,45 +90,12 @@ def actualizar_config(
 
 
 # ---------- Logo del local ----------
-def _guardar_archivo(archivo: UploadFile, datos: bytes) -> str:
-    """Valida la imagen, la guarda en uploads con nombre único logo_<uuid>.<ext>
-    y devuelve su ruta relativa ("/uploads/logo_xxx.png"). Reutiliza el mismo
-    UPLOAD_DIR y las mismas validaciones que las fotos de productos."""
-    if not archivo.content_type or not archivo.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
-    if len(datos) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
-
+def _armar_nombre_logo(archivo: UploadFile) -> str:
+    """Nombre único logo_<uuid>.<ext>. La VALIDACIÓN de tipo/tamaño es de este
+    endpoint; el helper de storage solo decide dónde se escribe (disco/Blob).
+    Extensión fallback ".png"."""
     ext = os.path.splitext(archivo.filename or "")[1].lower() or ".png"
-    nombre = f"logo_{uuid.uuid4().hex}{ext}"
-    upload_dir = router_productos.UPLOAD_DIR
-    os.makedirs(upload_dir, exist_ok=True)
-    with open(os.path.join(upload_dir, nombre), "wb") as f:
-        f.write(datos)
-    return f"/uploads/{nombre}"
-
-
-def _quitar_archivo_logo(url: str | None) -> None:
-    """Borra el archivo físico del logo ("/uploads/x" -> uploads/x). try/except:
-    si ya lo borraron a mano, no rompemos por eso (mismo criterio que productos)."""
-    if not url:
-        return
-    archivo = os.path.join(router_productos.UPLOAD_DIR, url.rsplit("/", 1)[-1])
-    try:
-        os.remove(archivo)
-    except OSError:
-        pass
-
-
-def _guardar_logo(fila: LocalConfig, db: Session, archivo: UploadFile, datos: bytes) -> ConfigOut:
-    """Reemplaza el logo: borra el archivo ANTERIOR (si había), guarda el nuevo
-    y persiste la ruta. Un solo punto para POST (subida) — lo usa el router."""
-    url = _guardar_archivo(archivo, datos)
-    _quitar_archivo_logo(fila.logo_url)
-    fila.logo_url = url
-    db.commit()
-    db.refresh(fila)
-    return fila
+    return f"logo_{uuid.uuid4().hex}{ext}"
 
 
 @router.post("/api/config/logo", response_model=ConfigOut)
@@ -138,19 +104,30 @@ async def subir_logo(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
-    """Admin: sube (o reemplaza) el logo del local. Devuelve la config con
-    logo_url apuntando al archivo nuevo."""
-    fila = _obtener_fila(db)
+    """Admin: sube (o reemplaza) el logo del local. Valida imagen <= 5 MB, guarda
+    con el helper ÚNICO de app/storage.py (disco en dev, Vercel Blob en prod),
+    borra el archivo del logo ANTERIOR si había, y devuelve la config nueva."""
+    if not archivo.content_type or not archivo.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
     datos = await archivo.read()
-    return _guardar_logo(fila, db, archivo, datos)
+    if len(datos) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
+
+    fila = _obtener_fila(db)
+    url = guardar_archivo(_armar_nombre_logo(archivo), datos, archivo.content_type)
+    borrar_archivo(fila.logo_url)
+    fila.logo_url = url
+    db.commit()
+    db.refresh(fila)
+    return fila
 
 
 @router.delete("/api/config/logo", response_model=ConfigOut)
 def borrar_logo(db: Session = Depends(get_db), _=Depends(require_admin)):
-    """Admin: quita el logo — la URL vuelve a "" y el archivo se borra de disco.
-    Borrar sin logo no es error: el estado final (sin logo) ya es la realidad."""
+    """Admin: quita el logo — la URL vuelve a "" y el archivo se borra de disco
+    o Blob. Borrar sin logo no es error: ese estado ya es la realidad."""
     fila = _obtener_fila(db)
-    _quitar_archivo_logo(fila.logo_url)
+    borrar_archivo(fila.logo_url)
     fila.logo_url = ""
     db.commit()
     db.refresh(fila)

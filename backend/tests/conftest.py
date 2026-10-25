@@ -43,12 +43,13 @@ def engine():
 
 @pytest.fixture()
 def uploads_dir(tmp_path, monkeypatch):
-    """Directorio temporal de uploads: subir_imagen/borrar_imagen escriben
-    y borran acá, nunca en backend/uploads/ real. Los tests pueden usar el
-    Path devuelto para verificar los archivos físicos."""
+    """Directorio temporal de uploads: guardar_archivo/borrar_archivo (app.storage,
+    helper único que usan productos/logo) escriben y borran acá, nunca en
+    backend/uploads/ real. Los tests pueden usar el Path devuelto para verificar
+    los archivos físicos."""
     carpeta = tmp_path / "uploads"
     carpeta.mkdir()
-    monkeypatch.setattr("app.routers.productos.UPLOAD_DIR", str(carpeta))
+    monkeypatch.setattr("app.storage.UPLOAD_DIR", str(carpeta))
     return carpeta
 
 

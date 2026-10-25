@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # será la URL de Vercel. Lista separada por comas.
     cors_origins: str = "http://localhost:5173"
 
+    # Token de Vercel Blob (lo genera Vercel al vincular el store). Vacío = dev:
+    # guardar_archivo/borrar_archivo usan el disco backend/uploads/. Con token =
+    # prod: HTTP directo a la API REST de Blob (ver app/storage.py).
+    blob_read_write_token: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Convierte el string "a,b" en una lista ["a","b"], quitando espacios."""

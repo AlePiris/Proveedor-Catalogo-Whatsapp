@@ -54,17 +54,13 @@ from app.config import settings
 router = APIRouter(prefix="/api/productos", tags=["productos"])
 combos_router = APIRouter(prefix="/api/combos", tags=["combos"])
 
-# Carpeta donde se guardan las imágenes subidas. En dev local se sirve desde
-# acá (ver StaticFiles en main.py). En Vercel (serverless) esto NO persiste:
-# para producción hay que migrar a Vercel Blob (guarda en su CDN y devuelve una URL).
-#
-# OJO con la profundidad de dirname: __file__ es app/routers/productos.py, así que
-#   dirname 1 -> app/routers
-#   dirname 2 -> app
-#   dirname 3 -> backend   <- la carpeta que queremos (donde main.py monta /uploads)
-# Si nos quedamos en 2 dirnames, las imágenes se guardan en app/uploads pero el
-# server las sirve de backend/uploads -> 404 y no se ven. Por eso 3 dirnames.
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+# Los archivos de imágenes se guardan/borran con el helper ÚNICO de app/storage.py:
+# en dev escribe el disco (URL relativa /uploads/<archivo>, servida por StaticFiles
+# en main.py); en prod (con BLOB_READ_WRITE_TOKEN) sube a Vercel Blob y devuelve la
+# URL absoluta de su CDN. El UPLOAD_DIR del módulo storage se lee EN TIEMPO DE
+# REQUEST (module attr, no from-import) para que el fixture uploads_dir de los
+# tests —que parchea app.storage.UPLOAD_DIR— siga aislando el disco de verdad.
+from app import storage
 
 
 # ---------- Helpers de stock de combos ----------
@@ -248,7 +244,7 @@ def borrar_producto(
     db.query(ComboItem).filter(ComboItem.producto_id == producto_id).delete()
     # Limpia también los ARCHIVOS de uploads ({id}_<uuid>.<ext>): si no, quedan
     # huérfanos ocupando disco. Las filas de producto_imagenes van por cascade.
-    for path in glob.glob(os.path.join(UPLOAD_DIR, f"{producto_id}_*")):
+    for path in glob.glob(os.path.join(storage.UPLOAD_DIR, f"{producto_id}_*")):
         try:
             os.remove(path)
         except OSError:
@@ -294,14 +290,13 @@ async def subir_imagen(
     ext = os.path.splitext(archivo.filename or "")[1].lower() or ".jpg"
     nombre = f"{producto_id}_{uuid.uuid4().hex}{ext}"
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    with open(os.path.join(UPLOAD_DIR, nombre), "wb") as f:
-        f.write(datos)
+    # El helper ÚNICO decide dónde vive el archivo (disco en dev, Blob en prod):
+    # la URL que guarda en la fila es la que devuelve.
+    url = storage.guardar_archivo(nombre, datos, archivo.content_type)
 
     # APPEND a la galería. "Sin filas NI imagen_url" (no solo "sin filas"):
     # si el dueño seteó imagen_url a mano por PUT y recién ahora sube una foto,
     # esa foto NO debe robarle la principal.
-    url = f"/uploads/{nombre}"
     es_primera = len(producto.imagenes) == 0 and not producto.imagen_url
     db.add(ProductoImagen(producto_id=producto.id, url=url, orden=len(producto.imagenes)))
     if es_primera:
@@ -330,13 +325,9 @@ def borrar_imagen(
     if imagen is None:
         raise HTTPException(status_code=404, detail="Imagen no encontrada")
 
-    # El archivo físico: la url es "/uploads/<nombre>" -> nos quedamos con la
-    # parte final. try/except: si ya lo borraron a mano, no rompemos por eso.
-    archivo = os.path.join(UPLOAD_DIR, imagen.url.rsplit("/", 1)[-1])
-    try:
-        os.remove(archivo)
-    except OSError:
-        pass
+    # El archivo físico del logo/anterior: lo borra el helper (disco o Blob).
+    # try/except adentro: si ya lo borraron a mano, no rompemos por eso.
+    storage.borrar_archivo(imagen.url)
 
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     era_principal = producto.imagen_url == imagen.url
