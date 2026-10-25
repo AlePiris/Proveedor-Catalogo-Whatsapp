@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import type { EstadoPedido, PedidoItemInput, PedidoOut, TipoPago } from "@/types";
+import { ConfirmModal } from "@/components/Modal";
 
 export default function GestionPedidos() {
   const [pedidos, setPedidos] = useState<PedidoOut[]>([]);
   const [filtro, setFiltro] = useState<EstadoPedido | "todas">("pendiente");
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Pedido pendiente de CANCELAR (abre el ConfirmModal propio del tema).
+  const [aPedirCancelar, setAPedirCancelar] = useState<PedidoOut | null>(null);
 
   async function cargar() {
     try {
@@ -32,7 +35,11 @@ export default function GestionPedidos() {
   }
 
   async function cancelar(p: PedidoOut) {
-    if (!confirm("¿Cancelar este pedido?")) return;
+    setAPedirCancelar(p); // la confirmación vive en el ConfirmModal propio
+  }
+
+  async function confirmarCancelar(p: PedidoOut) {
+    setAPedirCancelar(null);
     try {
       await api.admin.cancelarPedido(p.id);
       await cargar();
@@ -87,6 +94,17 @@ export default function GestionPedidos() {
           onCancelar={cancelar}
         />
       ))}
+
+      {aPedirCancelar && (
+        <ConfirmModal
+          titulo="Cancelar pedido"
+          mensaje={`¿Cancelar el pedido de ${aPedirCancelar.cliente_nombre}? Si tenía combos, se reintegra el stock de lo elegido.`}
+          textoConfirmar="Cancelar pedido"
+          peligroso
+          onConfirmar={() => confirmarCancelar(aPedirCancelar)}
+          onCancelar={() => setAPedirCancelar(null)}
+        />
+      )}
     </div>
   );
 }
@@ -368,7 +386,7 @@ function PedidoCard({
                 <>
                   <input
                     className="border-negro-borde bg-negro text-gray-100 placeholder:text-gray-500 rounded px-1 py-0.5 flex-1 min-w-0"
-                    placeholder='Nombre del extra (ej. "bacon extra")'
+                    placeholder=""
                     value={f.nombre}
                     onChange={(e) => editarFila(f.key, (x) => ({ ...x, nombre: e.target.value }))}
                   />

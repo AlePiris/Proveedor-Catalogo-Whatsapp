@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { api } from "@/api/client";
 import type { Producto } from "@/types";
+import { ConfirmModal } from "@/components/Modal";
 
 // Galería de TODAS las fotos de un producto, para el panel del dueño. La usan
 // las cards de admin de productos y combos (por eso es componente compartido).
 // Desde acá se puede: subir una foto más (AGREGA a la galería, ya no pisa),
-// marcar una como PRINCIPAL (la de las cards) y borrar una.
+// marcar una como PRINCIPAL (la de las cards) y borrar una (ConfirmModal
+// propio, no el confirm() nativo que mostraba "localhost:5173 dice:").
 export default function AdminGaleriaImagenes({
   producto,
   onRecargar,
@@ -17,6 +19,8 @@ export default function AdminGaleriaImagenes({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
+  // Foto pendiente de borrar (modal abierto con su ConfirmModal).
+  const [aBorrar, setABorrar] = useState<{ id: number; principal: boolean } | null>(null);
 
   // Fallback: producto histórico cuya foto solo existe en imagen_url y la
   // tabla todavía no tiene filas (sin backfill) — la mostramos igual, sin
@@ -42,13 +46,23 @@ export default function AdminGaleriaImagenes({
     }
   }
 
-  async function borrar(imagenId: number) {
+  function borrar(imagenId: number) {
     if (imagenId === -1) return; // fallback histórico: no hay fila que borrar
-    if (!confirm("¿Borrar esta foto? Se quita de la galería (la principal pasa a la siguiente).")) return;
+    const principal = fotos.find((f) => f.id === imagenId)?.url === producto.imagen_url;
+    setABorrar({ id: imagenId, principal });
+  }
+
+  async function confirmarBorrar() {
+    if (!aBorrar || aBorrar.id === -1) {
+      setABorrar(null);
+      return;
+    }
     try {
-      await api.admin.deleteImagen(producto.id, imagenId);
+      await api.admin.deleteImagen(producto.id, aBorrar.id);
+      setABorrar(null);
       onRecargar();
     } catch (e) {
+      setABorrar(null);
       onError((e as Error).message);
     }
   }
@@ -122,6 +136,21 @@ export default function AdminGaleriaImagenes({
           if (f) subir(f);
         }}
       />
+
+      {aBorrar && (
+        <ConfirmModal
+          titulo="Borrar foto"
+          mensaje={
+            aBorrar.principal
+              ? "Es la foto PRINCIPAL (la de las cards): al borrarla, la principal pasa a la siguiente de la galería."
+              : "Se quita de la galería del producto."
+          }
+          textoConfirmar="Borrar"
+          peligroso
+          onConfirmar={confirmarBorrar}
+          onCancelar={() => setABorrar(null)}
+        />
+      )}
     </div>
   );
 }

@@ -3,12 +3,23 @@ import { api } from "@/api/client";
 import type { Categoria, Producto } from "@/types";
 import { esCombo } from "@/types";
 import AdminGaleriaImagenes from "@/components/AdminGaleriaImagenes";
+import { ConfirmModal, ModalInput } from "@/components/Modal";
+
+// ¿Qué modal está abierto? Un solo state con la ACCIÓN pendiente: el handler
+// de "confirmar" ejecuta lo que el dueño ya eligió. null = ninguno.
+type ModalPendiente =
+  | { tipo: "oferta"; p: Producto }
+  | { tipo: "borrar"; p: Producto }
+  | { tipo: "renombrar"; c: Categoria }
+  | { tipo: "borrar-cat"; c: Categoria }
+  | null;
 
 export default function GestionProductos() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalPendiente>(null);
 
   // Formulario "nuevo producto".
   const [nuevo, setNuevo] = useState({
@@ -72,14 +83,26 @@ export default function GestionProductos() {
   async function toggleOferta(p: Producto) {
     try {
       if (!p.en_oferta) {
-        const val = prompt(`Precio de oferta para "${p.nombre}" (normal: $${p.precio}):`);
-        if (val == null) return;
-        const num = parseFloat(val);
-        if (isNaN(num)) return;
-        await api.admin.setOferta(p.id, true, num);
-      } else {
-        await api.admin.setOferta(p.id, false, null);
+        // El precio lo pide el MODAL (no el prompt nativo): guardo el producto
+        // en el state y el modal llama a confirmarOferta con el valor.
+        setModal({ tipo: "oferta", p });
+        return;
       }
+      await api.admin.setOferta(p.id, false, null);
+      await cargar();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  // Modal de oferta: convierte el valor a número y aplica (mismas validaciones
+  // que el prompt nativo: NaN => no hace nada, así no rompe por un tipeo).
+  async function confirmarOferta(p: Producto, val: string) {
+    setModal(null);
+    const num = parseFloat(val);
+    if (isNaN(num)) return;
+    try {
+      await api.admin.setOferta(p.id, true, num);
       await cargar();
     } catch (e) {
       setError((e as Error).message);
@@ -92,7 +115,11 @@ export default function GestionProductos() {
   }
 
   async function borrar(p: Producto) {
-    if (!confirm(`¿Borrar "${p.nombre}"? Los pedidos históricos se conservan.`)) return;
+    setModal({ tipo: "borrar", p }); // la CONFIRMACIÓN vive en el ConfirmModal
+  }
+
+  async function confirmarBorrar(p: Producto) {
+    setModal(null);
     try {
       await api.admin.deleteProducto(p.id);
       await cargar();
@@ -117,9 +144,12 @@ export default function GestionProductos() {
   }
 
   async function renombrarCategoria(c: Categoria) {
-    const nombre = prompt(`Nuevo nombre para "${c.nombre}":`, c.nombre);
-    if (nombre == null) return;
-    const limpio = nombre.trim();
+    setModal({ tipo: "renombrar", c }); // prellenado en el ModalInput
+  }
+
+  async function confirmarRenombrar(c: Categoria, valor: string) {
+    setModal(null);
+    const limpio = valor.trim();
     if (!limpio || limpio === c.nombre) return;
     try {
       // El backend renombra EN CASCADA los productos que usan esta categoría.
@@ -132,7 +162,11 @@ export default function GestionProductos() {
   }
 
   async function borrarCategoria(c: Categoria) {
-    if (!confirm(`¿Borrar la categoría "${c.nombre}"? Solo se puede si no tiene productos.`)) return;
+    setModal({ tipo: "borrar-cat", c });
+  }
+
+  async function confirmarBorrarCategoria(c: Categoria) {
+    setModal(null);
     try {
       await api.admin.deleteCategoria(c.id);
       await cargarCategorias();
@@ -267,6 +301,49 @@ export default function GestionProductos() {
           />
         ))}
       </div>
+
+      {/* Modales propios (reemplazan confirm()/prompt() nativos). El switch
+          de "confirmar" despacha la acción ya elegida; Cancelar/Esc/click
+          fuera solo cierran. */}
+      {modal?.tipo === "oferta" && (
+        <ModalInput
+          titulo="Precio de oferta"
+          mensaje={`Precio de oferta para "${modal.p.nombre}" (normal: $${modal.p.precio}):`}
+          inicial={String(modal.p.precio)}
+          type="number"
+          onConfirmar={(valor) => confirmarOferta(modal.p, valor)}
+          onCancelar={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === "borrar" && (
+        <ConfirmModal
+          titulo="Borrar producto"
+          mensaje={`¿Borrar "${modal.p.nombre}"? Los pedidos históricos se conservan.`}
+          textoConfirmar="Borrar"
+          peligroso
+          onConfirmar={() => confirmarBorrar(modal.p)}
+          onCancelar={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === "renombrar" && (
+        <ModalInput
+          titulo="Renombrar categoría"
+          mensaje={`Nuevo nombre para "${modal.c.nombre}":`}
+          inicial={modal.c.nombre}
+          onConfirmar={(valor) => confirmarRenombrar(modal.c, valor)}
+          onCancelar={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === "borrar-cat" && (
+        <ConfirmModal
+          titulo="Borrar categoría"
+          mensaje={`¿Borrar la categoría "${modal.c.nombre}"? Solo se puede si no tiene productos.`}
+          textoConfirmar="Borrar"
+          peligroso
+          onConfirmar={() => confirmarBorrarCategoria(modal.c)}
+          onCancelar={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }

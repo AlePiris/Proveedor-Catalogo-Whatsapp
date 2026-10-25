@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { gruposCombo, type Producto } from "@/types";
 import AdminGaleriaImagenes from "@/components/AdminGaleriaImagenes";
+import { ConfirmModal } from "@/components/Modal";
 
 // Fila del editor de componentes. Dos formas:
 //  - FIJA: un producto concreto (producto_id + cantidad).
@@ -254,6 +255,9 @@ function AdminComboCard({
   onRecargar: () => Promise<void>;
   onError: (m: string) => void;
 }) {
+  // Combo pendiente de BORRAR (abre el ConfirmModal propio; sin confirm() nativo).
+  const [aBorrarCombo, setABorrarCombo] = useState(false);
+
   // Nombre/desc/precio/etiqueta/stock editables onBlur (patrón de Productos).
   async function editar(cambios: Partial<Producto>) {
     try {
@@ -338,18 +342,29 @@ function AdminComboCard({
             {c.activo ? "✅ Activo" : "🚫 Apagado"}
           </button>
           <button
-            onClick={async () => {
-              if (!confirm(`¿Borrar el combo "${c.nombre}"? Los pedidos históricos se conservan.`)) return;
-              try {
-                await api.admin.deleteCombo(c.id);
-                await onRecargar();
-              } catch (e) { onError((e as Error).message); }
-            }}
+            onClick={() => setABorrarCombo(true)}
             className="px-2 py-1 rounded text-xs font-semibold border border-marca text-marca hover:bg-marca/10"
           >
             Borrar
           </button>
         </div>
+
+        {aBorrarCombo && (
+          <ConfirmModal
+            titulo="Borrar combo"
+            mensaje={`¿Borrar el combo "${c.nombre}"? Los pedidos históricos se conservan.`}
+            textoConfirmar="Borrar"
+            peligroso
+            onConfirmar={async () => {
+              setABorrarCombo(false);
+              try {
+                await api.admin.deleteCombo(c.id);
+                await onRecargar();
+              } catch (e) { onError((e as Error).message); }
+            }}
+            onCancelar={() => setABorrarCombo(false)}
+          />
+        )}
       </div>
     </div>
   );
