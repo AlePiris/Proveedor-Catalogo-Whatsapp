@@ -146,3 +146,42 @@ def test_recuperar_rate_limit_429(cliente, rate_limit_fresco):
     for _ in range(3):
         assert _pedir(cliente, "tester").status_code == 200
     assert _pedir(cliente, "tester").status_code == 429
+
+
+# ---------- Tolerancia a fallos de SMTP (review: Important #3) ----------
+
+def test_recuperar_con_smtp_caido_sigue_200_generico(cliente, admin_headers, monkeypatch, rate_limit_fresco):
+    """Si el envío falla (SMTP caído, credencial vencida), la respuesta NO es
+    un 500: un error aquí confirmaría que el usuario existe. Se loguea y se
+    responde lo genérico de siempre."""
+    def smtp_caido(*a, **k):
+        raise RuntimeError("SMTP caído")
+    monkeypatch.setattr("app.routers.auth.enviar_email", smtp_caido)
+    resp = _pedir(cliente, "tester")
+    assert resp.status_code == 200
+    assert resp.json()["detail"] == MENSAJE_GENERICO
+
+
+def test_restablecer_con_smtp_caido_cambia_igual(cliente, sesion, admin_headers, monkeypatch, rate_limit_fresco):
+    """El EMAIL de aviso es informativo: si falla DESPUÉS de cambiar la
+    contraseña, el cambio ya sucedió — la respuesta es 200, no 500 (si no,
+    el dueño reintenta el link y el 400 de "ya se usó" lo confunde)."""
+    llamadas: list = []
+
+    def enviar_segun_llamada(asunto, cuerpo, destinatarios):
+        llamadas.append(cuerpo)  # guarda el cuerpo PARA SIEMPRE (aunque la 2ª explote)
+        if len(llamadas) == 2:  # la 2ª es el aviso post-cambio: falla
+            raise RuntimeError("SMTP caído")
+
+    monkeypatch.setattr("app.routers.auth.enviar_email", enviar_segun_llamada)
+    monkeypatch.setattr(settings, "frontend_url", "https://web.example.com")
+    resp = _pedir(cliente, "tester")  # 1ª llamada (recuperar): OK
+    assert resp.status_code == 200
+
+    token = re.search(r"token=([\w\-]+)", llamadas[0]).group(1)
+    resp2 = _usar_token(cliente, sesion, token, monkeypatch)
+    assert resp2.status_code == 200, resp2.text  # el cambio SÍ sucedió
+
+    # El cambio real sobrevivió al fallo del email: la nueva loguea y la vieja no.
+    assert cliente.post("/api/auth/login", json={"username": "tester", "password": "nueva-secreta-888"}).status_code == 200
+    assert cliente.post("/api/auth/login", json={"username": "tester", "password": "secreto123"}).status_code == 401

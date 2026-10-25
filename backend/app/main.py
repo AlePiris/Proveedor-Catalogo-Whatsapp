@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app import storage
 from app.config import settings
 from app.routers import auth, productos, pedidos, analisis, config_local, categorias
 
@@ -22,11 +23,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Sirve las imágenes subidas (guardadas en backend/uploads/) bajo /uploads.
-# En dev local basta con esto. En Vercel no se usa (ver nota en routers/productos.py).
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# Sirve las imágenes subidas bajo /uploads — SOLO DEV (disco backend/uploads/,
+# la MISMA carpeta que escribe app/storage.py; un solo cálculo de ruta en el repo).
+# En PROD serverless el filesystem es de solo lectura: hacer makedirs/mount al
+# importar crashea TODA la app (ni /api/health responde) — y las fotos van a
+# Vercel Blob, así que el mount sobra. El guard + try hace a la app imposible
+# de derribar por esto, incluso con una config a medias.
+if not settings.blob_read_write_token:
+    try:
+        os.makedirs(storage.UPLOAD_DIR, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=storage.UPLOAD_DIR), name="uploads")
+    except OSError:
+        print(f"[main] No se pudo montar /uploads: sin token Blob Y disk no escribible")
 
 # CORS: permite que el frontend (otro origen) llame a esta API. En dev es
 # localhost:5173; en prod, la URL de Vercel. allow_credentials=True prepara para

@@ -242,13 +242,15 @@ def borrar_producto(
     # Quita este producto de los combos que lo incluían. (El snapshot del
     # PedidoItem NO se toca: los pedidos históricos quedan intactos.)
     db.query(ComboItem).filter(ComboItem.producto_id == producto_id).delete()
-    # Limpia también los ARCHIVOS de uploads ({id}_<uuid>.<ext>): si no, quedan
-    # huérfanos ocupando disco. Las filas de producto_imagenes van por cascade.
-    for path in glob.glob(os.path.join(storage.UPLOAD_DIR, f"{producto_id}_*")):
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+    # Limpia también los ARCHIVOS de la galería + la principal denormalizada
+    # (si apunta a un archivo que no está entre las filas). Vía el helper ÚNICO:
+    # en prod las URLs son absolutas de Blob — el viejo glob de disco nunca las
+    # matcheaba y quedaban huérfanas de por vida en el free de 1 GB.
+    urls_de_las_fotos = [i.url for i in producto.imagenes]
+    if producto.imagen_url and producto.imagen_url not in urls_de_las_fotos:
+        urls_de_las_fotos.append(producto.imagen_url)
+    for url in urls_de_las_fotos:
+        storage.borrar_archivo(url)
     db.delete(producto)
     db.commit()
     return None

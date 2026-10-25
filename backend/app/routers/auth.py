@@ -105,16 +105,22 @@ def recuperar(datos: RecuperarRequest, request: Request, db: Session = Depends(g
         db.add(reset)
         db.commit()
 
+        # El email es la NOTIFICACIÓN, no la transacción: si SMTP está caído o
+        # RECOVERY_EMAILS quedó vacía, NO va a 500 — un error aquí confirmaría
+        # (en el status) que el username existe. Se loguea y se responde igual.
         link = f"{settings.frontend_url}/restablecer-password?token={token}"
-        enviar_email(
-            "Recuperación de contraseña",
-            (
-                "<p>Se pidió un restablecimiento de contraseña para el panel del dueño.</p>"
-                f"<p><a href=\"{link}\">Restablecer contraseña</a></p>"
-                "<p>Si no fuiste vos, ignorá este email (el enlace vence en 30 minutos).</p>"
-            ),
-            [e.strip() for e in settings.recovery_emails.split(",") if e.strip()],
-        )
+        try:
+            enviar_email(
+                "Recuperación de contraseña",
+                (
+                    "<p>Se pidió un restablecimiento de contraseña para el panel del dueño.</p>"
+                    f"<p><a href=\"{link}\">Restablecer contraseña</a></p>"
+                    "<p>Si no fuiste vos, ignorá este email (el enlace vence en 30 minutos).</p>"
+                ),
+                [e.strip() for e in settings.recovery_emails.split(",") if e.strip()],
+            )
+        except Exception as e:  # noqa: BLE001 — cualquier SMTP/host/cred error
+            print(f"[auth] email de recuperación NO enviado: {e!r}")
     return {"detail": MENSAJE_GENERICO}
 
 
@@ -145,9 +151,15 @@ def restablecer(datos: RestablecerRequest, db: Session = Depends(get_db)):
     admin.password_hash = hash_password(datos.password_nueva)
     fila.usado = True
     db.commit()
-    enviar_email(
-        "Se cambió la contraseña del panel",
-        "<p>La contraseña del panel del dueño acaba de cambiar vía enlace de recuperación.</p>",
-        [e.strip() for e in settings.recovery_emails.split(",") if e.strip()],
-    )
+    # El CAMBIO ya sucedió (commit arriba): que el email de aviso falle no
+    # puede convertir esto en 500 — el dueño reintentando vería el confuso
+    # "el enlace ya se usó" y creería que NO se cambió.
+    try:
+        enviar_email(
+            "Se cambió la contraseña del panel",
+            "<p>La contraseña del panel del dueño acaba de cambiar vía enlace de recuperación.</p>",
+            [e.strip() for e in settings.recovery_emails.split(",") if e.strip()],
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"[auth] email de aviso de cambio NO enviado: {e!r}")
     return {"detail": "Contraseña restablecida. Ya podés entrar con la nueva."}

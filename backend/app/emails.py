@@ -29,7 +29,7 @@ def enviar_email(asunto: str, cuerpo_html: str, destinatarios: list[str]) -> Non
     msg["To"] = ", ".join(destinatarios)
     msg.attach(MIMEText(cuerpo_html, "html", "utf-8"))
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as smtp:
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
         smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_pass)
         smtp.sendmail(msg["From"], destinatarios, msg.as_string())
