@@ -104,7 +104,7 @@ npm run dev
 
 **Navegador:**
 - Tienda: http://localhost:5173
-- Admin: http://localhost:5173/admin → `admin` / `admin123`
+- Admin: http://localhost:5173/admin → las credenciales de el `.env` (`ADMIN_USERNAME`/`ADMIN_PASSWORD`; Docker dev: `admin`/`admin123`)
 - Docs API: http://localhost:8800/docs
 
 Si los puertos están ocupados por un server que quedó colgado:
@@ -209,7 +209,9 @@ con holgura para el tráfico esperado.
 ---
 
 ## Datos importantes
-- Admin demo: `admin` / `admin123` (se carga con `seed.py`).
+- Admin: el usuario lo crea `seed.py` desde `ADMIN_USERNAME`/`ADMIN_PASSWORD`
+  (env vars/.env — nunca hardcodeadas). La contraseña se cambia desde Ajustes
+  (pestaña del dashboard) y hay recuperación por email a `RECOVERY_EMAILS`.
 - WhatsApp de prueba (en `frontend/.env.local`): `5491100000000` (cambiar al real).
 - Puerto backend: **8800** (evita 8000/8080/18000 que usa el usuario en otros proyectos).
 - `.env` y `.env.local` **no** están en git (tienen secretos); `.env.example` sí (placeholders).
