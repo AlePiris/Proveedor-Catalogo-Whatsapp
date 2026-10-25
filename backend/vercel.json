@@ -1,14 +1,11 @@
 {
-  "//": "Config mínima del backend en Vercel (spec 2026-09-27 §1): Vercel detecta FastAPI en app/main.py zero-config; esto excluye el DIRECTORIO tests/ del bundle serverless para no subir pytest al deploy.",
   "builds": [
     {
       "src": "app/main.py",
       "use": "@vercel/python",
       "config": {
-        "includedFiles": [],
         "excludeFiles": "tests/**;**/__pycache__/**"
       }
     }
-  ],
-  "$schema": "https://openapi.vercel.sh/vercel.json"
+  ]
 }
