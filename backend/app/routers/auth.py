@@ -7,10 +7,10 @@ Es el único endpoint que "da" algo: el resto de endpoints admin "exigen" el tok
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth import crear_token, verify_password
+from app.auth import crear_token, hash_password, require_admin, verify_password
 from app.database import get_db
 from app.models import AdminUser
-from app.schemas import LoginRequest, Token
+from app.schemas import LoginRequest, Token, PasswordChange, RecuperarRequest, RestablecerRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -31,3 +31,23 @@ def login(datos: LoginRequest, db: Session = Depends(get_db)):
         )
     token = crear_token(admin.id)
     return Token(access_token=token)
+
+
+@router.put("/password")
+def cambiar_contraseña(
+    datos: PasswordChange,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_admin),
+):
+    """Cambio de contraseña del dueño LOGUEADO (spec deploy §4b):
+    verifica la actual con bcrypt -> guarda el nuevo hash. La nueva exige
+    >= 8 caracteres. La respuesta es simple: {"ok": true}.
+    (require_admin entrega el AdminUser de la MISMA sesión get_db: acá se
+    persiste el cambio con commit.)"""
+    if len(datos.password_nueva) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres")
+    if not verify_password(datos.password_actual, admin.password_hash):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+    admin.password_hash = hash_password(datos.password_nueva)
+    db.commit()
+    return {"ok": True}

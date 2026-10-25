@@ -207,6 +207,26 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class PasswordChange(BaseModel):
+    """Cambio de contraseña del dueño LOGUEADO (spec deploy §4b). La nueva no
+    lleva validación de longitud en el schema: la fija el endpoint (400 si <8)
+    para que el mensaje de error diga exactamente eso."""
+    password_actual: str
+    password_nueva: str
+
+
+class RecuperarRequest(BaseModel):
+    """Body del "olvidé mi contraseña" (spec deploy §4c). Solo username: el
+    EMAIL va a direcciones fijas de env vars, nunca lo pide el formulario."""
+    username: str
+
+
+class RestablecerRequest(BaseModel):
+    """Body del restablecimiento con token del email."""
+    token: str
+    password_nueva: str
+
+
 # ---------- Pedidos ----------
 class EleccionOut(BaseModel):
     """La elección guardada en el pedido (para que el editor del dueño pueda

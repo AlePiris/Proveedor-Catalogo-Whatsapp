@@ -179,6 +179,15 @@ export const api = {
     borrarLogo: () =>
       request<LocalConfig>("/config/logo", { method: "DELETE" }, true),
 
+    // Cambio de contraseña del dueño logueado (spec deploy §4b). El backend
+    // revalida todo; acá el form también valida para no golpear la API al vacío.
+    cambiarPassword: (password_actual: string, password_nueva: string) =>
+      request<{ ok: boolean }>(
+        "/auth/password",
+        { method: "PUT", body: JSON.stringify({ password_actual, password_nueva }) },
+        true
+      ),
+
     // Categorías (secciones del menú)
     getCategorias: () => request<Categoria[]>("/categorias", {}, true),
     createCategoria: (nombre: string, orden = 0) =>

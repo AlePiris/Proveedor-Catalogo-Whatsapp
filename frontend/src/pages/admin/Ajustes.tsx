@@ -123,6 +123,44 @@ export default function Ajustes() {
     }
   }
 
+  // Cambio de contraseña del dueño (spec deploy §4b): tres campos, el backend
+  // revalida la actual y la longitud. Estado aparte del form de datos del local.
+  const [pwActual, setPwActual] = useState("");
+  const [pwNueva, setPwNueva] = useState("");
+  const [pwRepetir, setPwRepetir] = useState("");
+  const [guardandoPw, setGuardandoPw] = useState(false);
+  const [pwOk, setPwOk] = useState<string | null>(null);
+  const [pwError, setPwError] = useState<string | null>(null);
+
+  async function cambiarContraseña() {
+    setPwError(null);
+    setPwOk(null);
+    if (!pwActual || !pwNueva || !pwRepetir) {
+      setPwError("Completá los tres campos.");
+      return;
+    }
+    if (pwNueva.length < 8) {
+      setPwError("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (pwNueva !== pwRepetir) {
+      setPwError("Las contraseñas nuevas no coinciden.");
+      return;
+    }
+    setGuardandoPw(true);
+    try {
+      await api.admin.cambiarPassword(pwActual, pwNueva);
+      setPwOk("Contraseña cambiada ✓");
+      setPwActual("");
+      setPwNueva("");
+      setPwRepetir("");
+    } catch (e) {
+      setPwError((e as Error).message || "No se pudo cambiar la contraseña.");
+    } finally {
+      setGuardandoPw(false);
+    }
+  }
+
   if (cargando) return <p className="text-gray-300">Cargando ajustes…</p>;
 
   const inputCls = "w-full border border-negro-borde bg-negro text-gray-100 placeholder:text-gray-500 rounded-lg px-3 py-2";
@@ -279,6 +317,47 @@ export default function Ajustes() {
         >
           {guardando ? "Guardando…" : "Guardar ajustes"}
         </button>
+      </div>
+
+      <div className="border-t border-negro-borde pt-4 space-y-2">
+        <p className="font-semibold text-gray-100">Cambiar contraseña</p>
+        <p className="text-xs text-gray-400">
+          Con este usuario entrás al dashboard. Si sospechás que alguien la sabe, cambiala acá.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <input
+            type="password"
+            className={inputCls}
+            placeholder="Contraseña actual"
+            value={pwActual}
+            onChange={(e) => setPwActual(e.target.value)}
+          />
+          <input
+            type="password"
+            className={inputCls}
+            placeholder="Nueva (mín. 8 caracteres)"
+            value={pwNueva}
+            onChange={(e) => setPwNueva(e.target.value)}
+          />
+          <input
+            type="password"
+            className={inputCls}
+            placeholder="Repetir nueva"
+            value={pwRepetir}
+            onChange={(e) => setPwRepetir(e.target.value)}
+          />
+        </div>
+        {pwError && <p className="text-marca text-sm">{pwError}</p>}
+        {pwOk && <p className="text-green-400 text-sm">{pwOk}</p>}
+        <div className="flex justify-end">
+          <button
+            onClick={cambiarContraseña}
+            disabled={guardandoPw}
+            className="border border-negro-borde px-4 py-2 rounded-lg text-sm font-semibold text-gray-300 hover:border-marca/40 hover:text-marca disabled:opacity-50 transition"
+          >
+            {guardandoPw ? "Cambiando…" : "Cambiar contraseña"}
+          </button>
+        </div>
       </div>
     </div>
   );
