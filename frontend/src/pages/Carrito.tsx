@@ -113,7 +113,9 @@ export default function Carrito() {
         <Link to="/" className="text-marca hover:underline text-sm">
           ← Volver a la tienda
         </Link>
-        <h1 className="text-2xl font-bold text-gray-100 my-4">Tu carrito</h1>
+        <h1 className="font-display text-2xl sm:text-3xl uppercase tracking-tight text-gray-100 my-4">
+          Tu carrito
+        </h1>
 
         {items.length === 0 ? (
           <div className="text-center py-10 text-gray-200">
@@ -127,7 +129,7 @@ export default function Carrito() {
             {/* Lista de items con controles de cantidad */}
             <div className="space-y-3 mb-6">
               {items.map((i) => (
-                <div key={i.producto.id} className="flex items-center justify-between bg-negro-panel border border-negro-borde rounded-lg p-3">
+                <div key={i.producto.id} className="flex items-center justify-between bg-negro-panel border border-negro-borde rounded-lg p-3 shadow-card">
                   <div>
                     <p className="font-semibold">{i.producto.nombre}</p>
                     {/* Qué eligió el cliente en los grupos del combo
@@ -227,8 +229,8 @@ export default function Carrito() {
 
             {/* Total + enviar */}
             <div className="flex items-center justify-between mb-4">
-              <span className="text-lg text-gray-200">Total:</span>
-              <span className="text-2xl font-bold text-marca">${total.toLocaleString("es-AR")}</span>
+              <span className="text-lg text-gray-300 font-semibold">Total:</span>
+              <span className="font-display text-2xl text-marca">${total.toLocaleString("es-AR")}</span>
             </div>
 
             {error && <p className="text-marca mb-3">{error}</p>}
@@ -236,7 +238,7 @@ export default function Carrito() {
             <button
               onClick={enviarPedido}
               disabled={enviando}
-              className="w-full bg-marca text-black py-3 rounded-lg font-bold text-lg hover:bg-marca-clara disabled:opacity-50"
+              className="w-full bg-marca text-black py-3 rounded-lg font-bold text-lg hover:bg-marca-clara hover:shadow-glow active:scale-[0.99] disabled:opacity-50 disabled:hover:shadow-none transition-all"
             >
               {enviando ? "Enviando…" : "Enviar pedido por WhatsApp"}
             </button>

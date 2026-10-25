@@ -321,6 +321,9 @@ class ConfigOut(BaseModel):
     radio_delivery_km: int
     horarios: str
     descripcion: str
+    # Logo del local: ruta relativa "/uploads/..." o "" si no hay. Sin imagen
+    # no hay logo (la imagen ES el interruptor; no existe toggle aparte).
+    logo_url: str
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -334,3 +337,7 @@ class ConfigUpdate(BaseModel):
     radio_delivery_km: Optional[int] = Field(default=None, ge=0)  # no hay radio negativo
     horarios: Optional[str] = None
     descripcion: Optional[str] = None
+    # "" = sin logo. El flujo normal del frontend es el POST/DELETE de
+    # /api/config/logo (sube o borra el archivo); este campo queda como vía
+    # directa para limpiarlo o setearlo a mano.
+    logo_url: Optional[str] = None

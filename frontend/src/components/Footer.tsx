@@ -17,30 +17,38 @@ export default function Footer() {
   if (!config) return null;
 
   return (
-    <footer className="border-t border-negro-borde bg-negro mt-12">
-      <div className="max-w-7xl mx-auto px-4 py-6 text-sm text-gray-400 grid gap-4 sm:grid-cols-3">
+    <footer className="border-t border-negro-borde bg-negro mt-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 text-sm text-gray-400 grid gap-6 sm:grid-cols-3">
         <div>
-          <p className="font-bold text-marca mb-1">🍫 {config.nombre}</p>
-          {config.descripcion && <p className="text-xs">{config.descripcion}</p>}
+          <div className="flex items-center gap-2.5 mb-2">
+            {/* Logo del local solo si el dueño subió imagen (imagen = interruptor),
+                sobre chip blanco igual que en el Navbar. */}
+            {config.logo_url && (
+              <img
+                src={config.logo_url}
+                alt=""
+                className="w-10 h-10 rounded-xl bg-white object-contain p-0.5 ring-1 ring-white/10"
+              />
+            )}
+            <p className="font-display text-marca text-lg">{config.nombre}</p>
+          </div>
+          {config.descripcion && <p className="text-xs leading-relaxed">{config.descripcion}</p>}
         </div>
-        <div className="space-y-1">
-          {config.direccion && (
-            <p>
-              📍 {config.direccion}
-            </p>
-          )}
+        <div className="space-y-1.5">
+          {config.direccion && <p>📍 {config.direccion}</p>}
           {config.telefono && (
             <p>
-              📞 <a className="hover:text-marca" href={`tel:${config.telefono.replace(/\s/g, "")}`}>{config.telefono}</a>
+              📞{" "}
+              <a className="hover:text-marca transition-colors" href={`tel:${config.telefono.replace(/\s/g, "")}`}>
+                {config.telefono}
+              </a>
             </p>
           )}
           {config.horarios && <p>🕒 {config.horarios}</p>}
         </div>
-        <div className="space-y-1">
-          {config.radio_delivery_km > 0 && (
-            <p>🛵 Delivery hasta {config.radio_delivery_km} km a la redonda</p>
-          )}
-          <Link to="/contacto" className="inline-block text-marca hover:underline">
+        <div className="space-y-1.5">
+          {config.radio_delivery_km > 0 && <p>🛵 Delivery hasta {config.radio_delivery_km} km a la redonda</p>}
+          <Link to="/contacto" className="inline-block text-marca hover:underline font-semibold">
             Ver contacto y horarios →
           </Link>
         </div>

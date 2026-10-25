@@ -95,7 +95,7 @@ function Galeria({ producto }: { producto: Producto }) {
         <img
           src={fotos[activa]}
           alt={producto.nombre}
-          className="w-full aspect-square object-cover rounded-xl border border-negro-borde"
+          className="w-full aspect-square object-cover rounded-xl border border-negro-borde shadow-card"
         />
       ) : (
         <div className="w-full aspect-square rounded-xl bg-negro-panel border border-negro-borde flex items-center justify-center text-7xl">
@@ -130,30 +130,32 @@ function InfoProducto({ producto }: { producto: Producto }) {
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-wrap items-center gap-1 mb-2">
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
         {esCombo(producto) && (
-          <span className="self-start bg-marca text-black text-xs font-bold px-2 py-0.5 rounded">
-            COMBO
+          <span className="self-start bg-marca text-black text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">
+            Combo
           </span>
         )}
         {producto.etiqueta && (
-          <span className="self-start border border-marca/40 text-marca text-xs font-bold px-2 py-0.5 rounded">
+          <span className="self-start border border-marca/40 text-marca text-[11px] font-bold px-2 py-0.5 rounded-full">
             {producto.etiqueta}
           </span>
         )}
         {!esCombo(producto) && producto.en_oferta && (
-          <span className="self-start bg-marca text-black text-xs font-bold px-2 py-0.5 rounded">
-            OFERTA
+          <span className="self-start bg-marca text-black text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">
+            Oferta
           </span>
         )}
         {sinStock && (
-          <span className="self-start bg-gray-700 text-white text-xs font-bold px-2 py-0.5 rounded">
-            SIN STOCK
+          <span className="self-start bg-gray-700 text-white text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">
+            Sin stock
           </span>
         )}
       </div>
 
-      <h1 className="font-bold text-2xl text-gray-100">{producto.nombre}</h1>
+      <h1 className="font-display text-2xl sm:text-3xl uppercase tracking-tight text-gray-100">
+        {producto.nombre}
+      </h1>
 
       {producto.descripcion && (
         <p className="text-sm text-gray-400 mt-2">{producto.descripcion}</p>
@@ -370,7 +372,7 @@ function DetalleCombo({ producto }: { producto: Producto }) {
           onClick={agregarAlCarrito}
           disabled={sinStock || !gruposCompletos}
           title={!gruposCompletos ? "Completá las opciones a elección primero" : undefined}
-          className="mt-4 bg-marca text-black py-2 rounded-lg font-semibold hover:bg-marca-clara disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="mt-4 bg-marca text-black py-2.5 rounded-lg font-bold hover:bg-marca-clara hover:shadow-glow active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none transition-all"
         >
           {sinStock ? "Sin stock" : cantidad > 0 ? "Agregar una más" : "Agregar al carrito"}
         </button>
@@ -435,7 +437,7 @@ function DetalleSimple({ producto }: { producto: Producto }) {
         <button
           onClick={() => add(producto, cantidad)}
           disabled={sinStock}
-          className="mt-4 bg-marca text-black py-2 rounded-lg font-semibold hover:bg-marca-clara disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="mt-4 bg-marca text-black py-2.5 rounded-lg font-bold hover:bg-marca-clara hover:shadow-glow active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none transition-all"
         >
           {sinStock ? "Sin stock" : cantidadEnCarrito > 0 ? "Agregar una más" : "Agregar al carrito"}
         </button>

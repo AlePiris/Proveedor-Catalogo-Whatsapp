@@ -1,7 +1,8 @@
 // Pestaña Ajustes del dashboard: el dueño edita los datos del local
-// (nombre, dirección, contacto, radio de delivery, horarios, descripción).
+// (nombre, dirección, contacto, radio de delivery, horarios, descripción)
+// y sube/quita el LOGO (la imagen es el interruptor: sin subida no hay logo).
 // Todo lo que carga acá lo muestran el footer, /contacto y el carrito.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/api/client";
 import type { LocalConfig } from "@/types";
 
@@ -14,6 +15,7 @@ const VACIO: LocalConfig = {
   radio_delivery_km: 0,
   horarios: "",
   descripcion: "",
+  logo_url: "",
 };
 
 export default function Ajustes() {
@@ -22,6 +24,10 @@ export default function Ajustes() {
   const [guardando, setGuardando] = useState(false);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Subida/borrado del logo en curso (feedback en el botón mientras viaja).
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  // Abrir el file picker programáticamente (el input va escondido detrás del botón).
+  const inputLogoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
@@ -74,6 +80,49 @@ export default function Ajustes() {
     }
   }
 
+  async function subirLogo(file: File | undefined) {
+    if (!file) return;
+    // Validación temprana (el backend revalida): solo imágenes, hasta 5 MB.
+    if (!file.type.startsWith("image/")) {
+      setError("El logo debe ser una imagen (PNG, JPG...).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("La imagen del logo supera los 5 MB.");
+      return;
+    }
+    setError(null);
+    setOkMsg(null);
+    setSubiendoLogo(true);
+    try {
+      const guardado = await api.admin.uploadLogo(file);
+      setForm((f) => ({ ...f, logo_url: guardado.logo_url }));
+      setOkMsg("Logo actualizado ✓ Ya se ve en la web (Navbar, Footer y favicon).");
+    } catch (e) {
+      setError((e as Error).message || "No se pudo subir el logo.");
+    } finally {
+      setSubiendoLogo(false);
+      // Permite volver a elegir el MISMO archivo más adelante (si no, el
+      // evento change no dispara de nuevo para el mismo input.value).
+      if (inputLogoRef.current) inputLogoRef.current.value = "";
+    }
+  }
+
+  async function quitarLogo() {
+    setError(null);
+    setOkMsg(null);
+    setSubiendoLogo(true);
+    try {
+      const guardado = await api.admin.borrarLogo();
+      setForm((f) => ({ ...f, logo_url: guardado.logo_url }));
+      setOkMsg("Logo quitado ✓ La web vuelve a mostrar solo el nombre.");
+    } catch (e) {
+      setError((e as Error).message || "No se pudo quitar el logo.");
+    } finally {
+      setSubiendoLogo(false);
+    }
+  }
+
   if (cargando) return <p className="text-gray-300">Cargando ajustes…</p>;
 
   const inputCls = "w-full border border-negro-borde bg-negro text-gray-100 placeholder:text-gray-500 rounded-lg px-3 py-2";
@@ -91,6 +140,54 @@ export default function Ajustes() {
 
       {error && <p className="text-marca text-sm">{error}</p>}
       {okMsg && <p className="text-green-400 text-sm">{okMsg}</p>}
+
+      {/* LOGO del local: la imagen ES el interruptor. Sin subida, la web
+          muestra solo el nombre (nada cambia); con imagen, el logo aparece
+          en el Navbar, el Footer y el favicon del navegador. */}
+      <div className="border border-negro-borde rounded-xl p-4 flex flex-wrap items-center gap-4">
+        <div className="w-20 h-20 rounded-lg bg-white flex items-center justify-center overflow-hidden shrink-0">
+          {form.logo_url ? (
+            <img src={form.logo_url} alt="Logo del local" className="w-full h-full object-contain p-1" />
+          ) : (
+            <span className="text-3xl" aria-hidden>🏪</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <p className="text-sm font-semibold text-gray-300">Logo del local</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {form.logo_url
+              ? "Se muestra en el Navbar, el Footer y el favicon. Subir una nueva reemplaza la anterior."
+              : "Sin imagen no hay logo: la web muestra solo el nombre. Subí una y aparece solo."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={inputLogoRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => subirLogo(e.target.files?.[0])}
+          />
+          <button
+            type="button"
+            onClick={() => inputLogoRef.current?.click()}
+            disabled={subiendoLogo}
+            className="bg-marca text-black px-4 py-2 rounded-lg text-sm font-semibold hover:bg-marca-clara disabled:opacity-50 transition"
+          >
+            {subiendoLogo ? "Subiendo…" : form.logo_url ? "Reemplazar logo" : "Subir logo"}
+          </button>
+          {form.logo_url && (
+            <button
+              type="button"
+              onClick={quitarLogo}
+              disabled={subiendoLogo}
+              className="border border-negro-borde px-4 py-2 rounded-lg text-sm font-semibold text-gray-300 hover:text-marca hover:border-marca/40 disabled:opacity-50 transition"
+            >
+              Quitar logo
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

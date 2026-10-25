@@ -161,6 +161,23 @@ export const api = {
     // Config del local (Ajustes)
     updateConfig: (c: Partial<LocalConfig>) =>
       request<LocalConfig>("/config", { method: "PUT", body: JSON.stringify(c) }, true),
+    // Logo del local (Ajustes): sube o quita la imagen. La imagen ES el
+    // interruptor: sin subida no hay logo, y con subida reemplaza la anterior.
+    uploadLogo: async (file: File) => {
+      const fd = new FormData();
+      fd.append("archivo", file);
+      const headers: Record<string, string> = { Accept: "application/json" };
+      const t = getToken();
+      if (t) headers["Authorization"] = `Bearer ${t}`;
+      const res = await fetch(`${BASE}/config/logo`, { method: "POST", body: fd, headers });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error((data && data.detail) || "No se pudo subir el logo");
+      }
+      return (await res.json()) as LocalConfig;
+    },
+    borrarLogo: () =>
+      request<LocalConfig>("/config/logo", { method: "DELETE" }, true),
 
     // Categorías (secciones del menú)
     getCategorias: () => request<Categoria[]>("/categorias", {}, true),

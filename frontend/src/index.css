@@ -12,4 +12,33 @@ html, body, #root {
 body {
   background-color: #0a0a0a;
   color: #f3f4f6;
+  /* Tipografía de marca: Manrope en TODO el texto; los títulos piden
+     font-display (Archivo Black) clase por clase. */
+  font-family: "Manrope", system-ui, sans-serif;
+  /* Halo sutil de marca arriba del fondo: negro + negro, con un leve tinte
+     amarillo detrás del contenido (como una luz de vidriera). No cambia el
+     color base: si el gradiente no carga, sigue siendo #0a0a0a. */
+  background-image:
+    radial-gradient(55rem 24rem at 50% -6rem, rgba(255, 210, 48, 0.07), transparent 65%),
+    radial-gradient(40rem 20rem at 85% 12%, rgba(255, 210, 48, 0.04), transparent 60%);
+  background-attachment: fixed;
 }
+
+/* Selección de texto con color de marca (detalle chico que delata cuidar). */
+::selection {
+  background: rgba(255, 210, 48, 0.35);
+  color: #fff;
+}
+
+/* Foco accesible en TODO: anillo amarillo suave; nunca el azul default. */
+:focus-visible {
+  outline: 2px solid rgba(255, 210, 48, 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbar a tono con el tema oscuro (Webkit). */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: #2b2b2b; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }

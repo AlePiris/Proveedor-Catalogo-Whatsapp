@@ -320,3 +320,6 @@ class LocalConfig(Base):
     radio_delivery_km = Column(Integer, nullable=False, default=0)
     horarios = Column(String(200), nullable=False, default="")
     descripcion = Column(Text, nullable=False, default="")
+    # Logo del local: ruta relativa "/uploads/logo_xxx.png" o "" si no hay.
+    # La imagen ES el interruptor: vacío -> el frontend muestra solo el nombre.
+    logo_url = Column(String(255), nullable=False, default="")

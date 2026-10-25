@@ -23,16 +23,27 @@ export default function Contacto() {
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 py-10 flex-1 w-full">
-        <h1 className="text-2xl font-bold text-gray-100 mb-6">Contacto</h1>
+        <h1 className="font-display text-2xl sm:text-3xl uppercase tracking-tight text-gray-100 mb-6">
+          Contacto
+        </h1>
 
         {error && <p className="text-marca">Error: {error}</p>}
         {!config && !error && <p className="text-gray-300">Cargando…</p>}
 
         {config && (
-          <div className="bg-negro-panel border border-negro-borde rounded-xl shadow-sm p-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-bold text-marca"> {config.nombre}</h2>
-              {config.descripcion && <p className="text-gray-400 mt-1">{config.descripcion}</p>}
+          <div className="bg-negro-panel border border-negro-borde rounded-xl shadow-card p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              {config.logo_url && (
+                <img
+                  src={config.logo_url}
+                  alt=""
+                  className="w-12 h-12 rounded-xl bg-white object-contain p-0.5 ring-1 ring-white/10"
+                />
+              )}
+              <div>
+                <h2 className="font-display text-xl text-marca">{config.nombre}</h2>
+                {config.descripcion && <p className="text-gray-400 mt-0.5">{config.descripcion}</p>}
+              </div>
             </div>
 
             <ul className="space-y-3 text-gray-200">

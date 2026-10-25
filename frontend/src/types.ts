@@ -187,6 +187,9 @@ export interface LocalConfig {
   radio_delivery_km: number; // 0 = delivery deshabilitado
   horarios: string;
   descripcion: string;
+  // Logo del local: "/uploads/logo_xxx.png" o "" si no hay. La imagen ES el
+  // interruptor: vacío = no hay logo (solo el nombre, como siempre).
+  logo_url: string;
 }
 
 // ----- Análisis -----

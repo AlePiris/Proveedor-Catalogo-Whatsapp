@@ -75,6 +75,11 @@ MICROMIGRACIONES = [
         "elecciones",
         "ALTER TABLE pedido_items ADD COLUMN elecciones TEXT",
     ),
+    (
+        "local_config",
+        "logo_url",
+        "ALTER TABLE local_config ADD COLUMN logo_url VARCHAR(255) DEFAULT '' NOT NULL",
+    ),
 ]
 
 
