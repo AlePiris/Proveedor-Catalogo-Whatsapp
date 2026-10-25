@@ -1,0 +1,34 @@
+# ESPEJO de backend/requirements.txt: el builder @vercel/python de Vercel
+# busca requirements.txt JUNTO al entrypoint app/main.py, no en la raiz.
+# Si agregas o cambias un paquete, hazlo en AMBOS archivos (tests/test_vercel_builder.py
+# pinnea que queden sincronizados).
+
+# Framework web. Crea la API REST y la doc automática en /docs.
+fastapi
+
+# Servidor ASGI para correr FastAPI. El extra [standard] trae uvloop+httptools
+# (más rápido). En desarrollo corre `uvicorn app.main:app --reload`.
+uvicorn[standard]
+
+# ORM: abstrae SQL. Escribimos clases Python (models.py) y él genera las
+# tablas y queries. Permite cambiar SQLite<->Postgres sin tocar la lógica.
+sqlalchemy
+
+# Driver para que Python hable con PostgreSQL. El sufijo -binary trae las
+# librerías C compiladas (no hay que instalar nada extra en el sistema).
+psycopg2-binary
+
+# Lee variables de entorno (.env) y las valida con tipos (Pydantic).
+pydantic-settings
+
+# Genera y verifica tokens JWT (login del admin). El extra [cryptography]
+# trae el algoritmo de firma.
+python-jose[cryptography]
+
+# Hashea passwords con bcrypt. Nunca guardamos la password en claro: solo el hash.
+# Usamos bcrypt directamente (sin passlib) porque passlib 1.7 no es compatible
+# con bcrypt 4.x (rompe leyendo la versión de la librería).
+bcrypt
+
+# Permite leer formularios (el login manda username/password como form-data).
+python-multipart
