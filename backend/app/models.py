@@ -129,6 +129,24 @@ class AdminUser(Base):
     nombre = Column(String(120), nullable=False)
 
 
+class PasswordReset(Base):
+    """
+    Solicitud de recuperación de contraseña ("olvidé mi contraseña", spec
+    deploy §4c). Una fila por token pedido; el token REAL viaja solo por
+    email — en la DB queda SOLO su hash SHA-256 (si alguien ve la DB, no
+    puede usar esos tokens). Un solo uso y expira a los 30 minutos.
+    """
+
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)
+    token_hash = Column(String(255), unique=True, nullable=False, index=True)
+    expira_en = Column(DateTime, nullable=False)
+    usado = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Pedido(Base):
     __tablename__ = "pedidos"
 

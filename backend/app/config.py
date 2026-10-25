@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     admin_username: str = ""
     admin_password: str = ""
 
+    # --- Recuperación de contraseña por email (spec deploy §4c/4d) ---
+    # El email SIEMPRE va a estas direcciones FIJAS (owner + dev): el form
+    # público nunca pide un email (no filtra existencias, no recibe spam).
+    frontend_url: str = ""      # link del email: {frontend_url}/restablecer-password?token=...
+    recovery_emails: str = ""   # coma-separadas
+
+    # Envío SMTP (Gmail app-password recomendado, o Brevo). Vacíos en dev:
+    # enviar_email no envía nada (log) hasta configurar esto.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    email_from: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Convierte el string "a,b" en una lista ["a","b"], quitando espacios."""

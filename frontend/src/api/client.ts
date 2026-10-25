@@ -76,6 +76,16 @@ export const api = {
   login: (username: string, password: string) =>
     request<Token>("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
 
+  // Recuperación de contraseña (públicos; spec deploy §4c). responder SIEMPRE
+  // genérico: el backend nunca confirma si el usuario existe.
+  recuperarPassword: (username: string) =>
+    request<{ detail: string }>("/auth/recuperar", { method: "POST", body: JSON.stringify({ username }) }),
+  restablecerPassword: (token: string, password_nueva: string) =>
+    request<{ detail: string }>(
+      "/auth/restablecer",
+      { method: "POST", body: JSON.stringify({ token, password_nueva }) }
+    ),
+
   // ===== Admin (auth=true) =====
   admin: {
     // Productos

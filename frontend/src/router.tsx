@@ -5,6 +5,8 @@ import Contacto from "@/pages/Contacto";
 import ProductoDetalle from "@/pages/ProductoDetalle";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
+import RecuperarPassword from "@/pages/RecuperarPassword";
+import RestablecerPassword from "@/pages/RestablecerPassword";
 
 // Mapa de rutas de la SPA.
 //  /              -> la tienda (catálogo público)
@@ -12,6 +14,8 @@ import AdminDashboard from "@/pages/AdminDashboard";
 //  /carrito       -> checkout (arma el mensaje de WhatsApp y guarda el pedido)
 //  /contacto      -> info del local (dirección, contacto, horarios, delivery)
 //  /admin         -> login del dueño (si no hay token) o dashboard (si lo hay)
+//  /recuperar-password             -> "olvidé mi contraseña": pide usuario y manda email
+//  /restablecer-password?token=... -> el link del email: nueva contraseña (un solo uso)
 export default function AppRoutes() {
   return (
     <Routes>
@@ -19,6 +23,8 @@ export default function AppRoutes() {
       <Route path="/producto/:id" element={<ProductoDetalle />} />
       <Route path="/carrito" element={<Carrito />} />
       <Route path="/contacto" element={<Contacto />} />
+      <Route path="/recuperar-password" element={<RecuperarPassword />} />
+      <Route path="/restablecer-password" element={<RestablecerPassword />} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />

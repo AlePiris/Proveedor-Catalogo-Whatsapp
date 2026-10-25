@@ -45,16 +45,17 @@ export default function AdminLogin() {
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && <p className="text-acento text-sm">{error}</p>}
-        <button className="w-full bg-marca text-black py-2 rounded-lg font-semibold hover:bg-marca-clara">
+        <button className="w-full bg-marca text-black py-2 rounded-lg font-bold hover:bg-marca-clara active:scale-[0.98] hover:shadow-glow transition-all">
           Entrar
         </button>
-        <Link
-          to="/"
-          className="block text-center text-sm text-gray-500 hover:text-marca"
-        >
-          ← Volver a la tienda
-        </Link>
-        <p className="text-xs text-gray-500 text-center">Demo: admin / admin123</p>
+        <div className="flex justify-between text-sm text-gray-500">
+          <Link to="/recuperar-password" className="hover:text-marca transition">
+            Olvidé mi contraseña
+          </Link>
+          <Link to="/" className="hover:text-marca transition">
+            ← Tienda
+          </Link>
+        </div>
       </form>
     </div>
   );
