@@ -87,8 +87,7 @@ export default function Carrito() {
         `Pago: ${pago}\n\n` +
         `${lineas}\n\n` +
         `*Total: $${pedido.total.toLocaleString("es-AR")}*\n` +
-        (notas.trim() ? `Notas: ${notas.trim()}\n` : "") +
-        `\n(Generado desde la web)`;
+        (notas.trim() ? `Notas: ${notas.trim()}\n` : "");
 
       // 3) ABRIMOS WhatsApp con el mensaje precargado.
       //    encodeURIComponent codifica espacios/saltos/acentos para la URL.

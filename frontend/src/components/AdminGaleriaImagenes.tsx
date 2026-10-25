@@ -72,24 +72,30 @@ export default function AdminGaleriaImagenes({
         {fotos.map((img) => {
           const esPrincipal = img.url === producto.imagen_url;
           return (
-            <div key={img.id} className="relative rounded-lg overflow-hidden border border-negro-borde group">
+            <div key={img.id} className="relative rounded-lg overflow-hidden border border-negro-borde">
               <img src={img.url} alt="" className="w-full aspect-square object-cover" />
-              <div className="absolute top-1 left-1 flex gap-1">
+              {/* Franja de acciones SIEMPRE visible abajo (antes eran dos
+                  botones de 24px en la esquina que se cortaban y casi no se
+                  podían tocar/borrar). Targets de 28px y etiqueta legible. */}
+              <div className="absolute inset-x-0 bottom-0 flex bg-black/70">
                 <button
                   onClick={() => marcarPrincipal(img.id)}
                   disabled={img.id === -1 || esPrincipal}
                   title={esPrincipal ? "Foto principal" : "Hacer principal"}
-                  className={`w-6 h-6 rounded text-xs leading-none ${
-                    esPrincipal ? "bg-marca text-black" : "bg-black/50 text-white hover:bg-black/70 disabled:opacity-50"
+                  className={`flex-1 h-7 text-[11px] font-bold flex items-center justify-center gap-0.5 transition ${
+                    esPrincipal
+                      ? "bg-marca text-black"
+                      : "text-white hover:bg-marca hover:text-black disabled:opacity-40 disabled:hover:bg-transparent"
                   }`}
                 >
-                  ★
+                  ★{esPrincipal ? " Principal" : ""}
                 </button>
                 <button
                   onClick={() => borrar(img.id)}
                   disabled={img.id === -1}
                   title="Borrar foto"
-                  className="w-6 h-6 rounded text-xs leading-none bg-black/50 text-white hover:bg-black/70 disabled:opacity-50"
+                  aria-label="Borrar foto"
+                  className="w-8 h-7 shrink-0 text-[11px] font-bold text-white flex items-center justify-center hover:bg-acento disabled:opacity-40 transition"
                 >
                   ✕
                 </button>
