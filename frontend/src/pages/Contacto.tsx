@@ -86,19 +86,17 @@ export default function Contacto() {
               )}
             </ul>
 
-            {/* Radio de delivery configurado por el dueño (informativo). */}
-            <div className="border-t border-negro-borde pt-4">
-              {config.radio_delivery_km > 0 ? (
+            {/* Radio de delivery configurado por el dueño (informativo).
+                Si queda en 0, no se muestra NINGUNA línea: el dueño decide
+                si publica la info de delivery cargando su radio. */}
+            {config.radio_delivery_km > 0 && (
+              <div className="border-t border-negro-borde pt-4">
                 <p className="text-sm text-gray-300">
                   🛵 <strong>Hacemos delivery hasta {config.radio_delivery_km} km</strong> a la
                   redonda del local. El alcance exacto lo confirmamos por WhatsApp.
                 </p>
-              ) : (
-                <p className="text-sm text-gray-400">
-                  Por ahora no ofrecemos delivery. Podés retirar tu pedido en el local.
-                </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </main>
