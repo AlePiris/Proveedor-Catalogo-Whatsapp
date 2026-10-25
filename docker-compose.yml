@@ -35,6 +35,10 @@ services:
       DATABASE_URL: postgresql+psycopg2://pizzeria:pizzeria@db:5432/pizzeria
       JWT_SECRET: cambia-esto-en-produccion-usa-algo-largo-y-aleatorio
       CORS_ORIGINS: http://localhost:5173,http://localhost:4173
+      # Credenciales del seed DE DESARROLLO (el seed las REQUIERE; en prod van
+      # reales en las env vars de Vercel). Cámbialas para tu dev si querés.
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
     ports:
       # host:contenedor. El backend escucha en 8800 del host (el 8000/8080/18000
       # están ocupados por tus otros proyectos). Dentro del contenedor sigue en 8000.

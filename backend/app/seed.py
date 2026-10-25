@@ -5,9 +5,15 @@ Uso (correr local):
     python -m app.seed
 
 Es idempotente: si el admin o los productos ya existen, no los duplica.
-El admin arranca con admin / admin123 (solo para desarrollo; en producción
-definir un password fuerte o cargarlo por variable de entorno).
+
+CREDENCIALES (sin hardcodeo, spec deploy §4a): el admin se crea leyendo
+ADMIN_USERNAME y ADMIN_PASSWORD del entorno/.env — el seed corta con error
+claro si falta alguna, ANTES de tocar la DB. Si el admin ya existe, no se
+lo toca (la password la maneja el dueño desde la web).
 """
+from sqlalchemy.orm import Session
+
+from app.config import settings
 from app.database import SessionLocal
 from app.models import Producto, AdminUser, LocalConfig, Categoria
 from app.auth import hash_password
@@ -53,19 +59,36 @@ CATALOGO = [
 ]
 
 
+def crear_admin(db: Session) -> None:
+    """Busca y crea el admin por settings.admin_username con hash de
+    settings.admin_password. Si ya existe NO lo toca: la password del dueño
+    (ya cambiada desde la web, quizá) sigue su curso."""
+    if db.query(AdminUser).filter(AdminUser.username == settings.admin_username).first() is None:
+        db.add(AdminUser(
+            username=settings.admin_username,
+            password_hash=hash_password(settings.admin_password),
+            nombre="Dueño",
+        ))
+        print(f"Admin creado: {settings.admin_username}")
+        # flush (no commit): main() hace el commit al final. Con flush queda
+        # VISIBLE para las queries de la misma sesión aunque llegue un
+        # rollback/cierre antes — y los tests (autoflush=False) lo ven igual.
+        db.flush()
+    else:
+        print("El admin ya existe (no se recrea).")
+
+
 def main():
+    # Validar credenciales ANTES de abrir la sesión: el seed en prod no debe
+    # conectarse (ni a medio conectar cortarse) por falta de configuración.
+    if not settings.admin_username:
+        raise SystemExit("Falta ADMIN_USERNAME — definila en backend/.env o en las env vars (ver .env.example)")
+    if not settings.admin_password:
+        raise SystemExit("Falta ADMIN_PASSWORD — definila en backend/.env o en las env vars (ver .env.example)")
+
     db = SessionLocal()
     try:
-        # Admin: solo si no existe ya.
-        if db.query(AdminUser).filter(AdminUser.username == "admin").first() is None:
-            db.add(AdminUser(
-                username="admin",
-                password_hash=hash_password("admin123"),
-                nombre="Dueño de la pizzería",
-            ))
-            print("Admin creado: admin / admin123")
-        else:
-            print("El admin ya existe (no se recrea).")
+        crear_admin(db)
 
         # Categorías: las base solo si no existe NINGUNA (si el dueño borró o
         # renombró categorías a mano, no las volvemos a meter).

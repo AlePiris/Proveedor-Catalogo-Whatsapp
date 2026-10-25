@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     # prod: HTTP directo a la API REST de Blob (ver app/storage.py).
     blob_read_write_token: str = ""
 
+    # Credenciales del admin que crea el seed (spec deploy §4a). SIN defaults:
+    # el seed corta con error si faltan — nunca admin/admin123 hardcodeado. En
+    # dev van en backend/.env; en prod, en las env vars del proyecto Vercel.
+    admin_username: str = ""
+    admin_password: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Convierte el string "a,b" en una lista ["a","b"], quitando espacios."""
