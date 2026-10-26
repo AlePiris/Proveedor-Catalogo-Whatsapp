@@ -17,7 +17,9 @@ Los routers (productos, config_local) NO escriben disco a mano: llaman acá.
 """
 import json
 import os
+import time
 import urllib.request
+import uuid as uuid_lib
 
 from app.config import settings
 
@@ -29,7 +31,30 @@ UPLOAD_DIR = os.path.join(
 )
 
 _BLOB_API = "https://vercel.com/api/blob"
+_BLOB_API_VERSION = "13"  # x-api-version: el valor que manda el SDK @vercel/blob
 _BLOB_TIMEOUT = 30  # segundos: archivos <= 5 MB, sin margen excesivo
+
+
+def _store_id_del_token(token: str) -> str:
+    """El token es 'vercel_blob_rw_<storeId>_<random>': el storeId es el 4to
+    tramo (así lo parsea el SDK oficial, helpers.ts)."""
+    tramos = token.split("_")
+    return tramos[3] if len(tramos) > 3 else ""
+
+
+def _headers_blob(token: str) -> dict:
+    """Headers de CONTEXTO que el API de Blob exige en TODAS sus llamadas
+    (requestApi del SDK @vercel/blob): request-id, store-id, attempt, versión.
+    Nuestros primeros PUTs murieron con 400 por omitirlos — con auth OIDC el
+    store-id ni siquiera viaja dentro del token."""
+    store_id = _store_id_del_token(token)
+    return {
+        "authorization": f"Bearer {token}",
+        "x-vercel-blob-store-id": store_id,
+        "x-api-blob-request-id": f"{store_id}:{int(time.time() * 1000)}:{uuid_lib.uuid4().hex[:12]}",
+        "x-api-blob-request-attempt": "0",
+        "x-api-version": _BLOB_API_VERSION,
+    }
 
 
 def guardar_archivo(nombre: str, contenido: bytes, content_type: str) -> str:
@@ -44,16 +69,20 @@ def guardar_archivo(nombre: str, contenido: bytes, content_type: str) -> str:
     if settings.blob_read_write_token:
         from urllib.parse import quote
 
+        token = settings.blob_read_write_token
+        headers = _headers_blob(token)
+        headers.update(
+            {
+                "x-content-type": content_type,
+                "x-vercel-blob-access": "public",
+                "x-add-random-suffix": "1",
+            }
+        )
         req = urllib.request.Request(
             f"{_BLOB_API}/?pathname={quote(nombre, safe='')}",
             data=contenido,
             method="PUT",
-            headers={
-                "Authorization": f"Bearer {settings.blob_read_write_token}",
-                "x-content-type": content_type,
-                "x-vercel-blob-access": "public",
-                "x-add-random-suffix": "1",
-            },
+            headers=headers,
         )
         with urllib.request.urlopen(req, timeout=_BLOB_TIMEOUT) as resp:
             data = json.loads(resp.read())
@@ -79,10 +108,7 @@ def borrar_archivo(url: str) -> None:
             f"{_BLOB_API}/delete",
             data=json.dumps({"urls": [url]}).encode(),
             method="POST",
-            headers={
-                "Authorization": f"Bearer {settings.blob_read_write_token}",
-                "Content-Type": "application/json",
-            },
+            headers={**_headers_blob(settings.blob_read_write_token), "Content-Type": "application/json"},
         )
         urllib.request.urlopen(req, timeout=_BLOB_TIMEOUT)
         return

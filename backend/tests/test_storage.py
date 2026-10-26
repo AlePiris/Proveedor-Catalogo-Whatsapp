@@ -46,8 +46,10 @@ def test_borrar_archivo_en_disco(cliente, uploads_dir, monkeypatch):
 
 def test_con_token_guarda_en_blob_y_devuelve_url_absoluta(monkeypatch):
     """Con token, el helper consulta la API REST de Blob (mockeada con
-    urllib) y devuelve la URL absoluta que Blob responde."""
-    monkeypatch.setattr(settings, "blob_read_write_token", "vercel_blob_rw_test")
+    urllib) y devuelve la URL absoluta que Blob responde. El API exige los
+    headers de contexto del SDK oficial (hallazgo deploy: con auth OIDC el
+    store-id NO viaja en el token — se manda por header)."""
+    monkeypatch.setattr(settings, "blob_read_write_token", "vercel_blob_rw_store123_rando")
 
     capturado: dict = {}
 
@@ -76,8 +78,18 @@ def test_con_token_guarda_en_blob_y_devuelve_url_absoluta(monkeypatch):
     assert url == "https://abc.blob.vercel-storage.com/x.png"
     assert "pathname=12_abc" in req.full_url or "pathname=12_abc.png" in req.full_url
     headers = {k.lower(): v for k, v in req.headers.items()}
-    assert headers["authorization"] == "Bearer vercel_blob_rw_test"
+    assert headers["authorization"] == "Bearer vercel_blob_rw_store123_rando"
     assert headers["x-content-type"] == "image/png"
+    assert headers["x-vercel-blob-access"] == "public"
+    assert headers["x-add-random-suffix"] == "1"
+    # Contexto de request/store que el API de Blob exige (SDK @vercel/blob;
+    # con auth OIDC el store-id NO viaja en el token -> va por header).
+    assert headers["x-vercel-blob-store-id"] == "store123"  # tramo 4 del token
+    assert headers["x-api-version"] == "13"
+    import re as _re
+
+    assert _re.match(r"^store123:\d+:[0-9a-f]{8,}$", headers["x-api-blob-request-id"])
+    assert headers["x-api-blob-request-attempt"] == "0"
 
 
 # ---------- Critical #1 (review): main.py en serverless ----------
