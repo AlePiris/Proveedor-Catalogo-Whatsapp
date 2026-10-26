@@ -146,3 +146,21 @@ def test_borrar_producto_delega_cada_foto_al_helper(cliente, admin_headers, crea
     assert resp.status_code == 204
     urls_de_las_fotos = {i["url"] for i in resp2.json()["imagenes"]}
     assert set(llamadas) == urls_de_las_fotos  # cada foto borrada por su URL
+
+
+def test_subir_imagen_con_error_de_guardado_muestra_la_causa(cliente, admin_headers, crear_producto, monkeypatch):
+    """Si guardar_archivo truena (Blob rechazado, FS read-only...), la respuesta
+    NO puede ser un 500 genérico: el dueño ve la CAUSA en el panel (así un
+    problema de storage se diagnosticó en el deploy real sin logs de servidor)."""
+    def explotar(*a, **k):
+        raise RuntimeError("blob PUT 403")
+
+    monkeypatch.setattr(storage, "guardar_archivo", explotar)
+    p = crear_producto()
+    r = cliente.post(
+        f"/api/productos/{p['id']}/imagen",
+        files={"archivo": ("a.png", PNG, "image/png")},
+        headers=admin_headers,
+    )
+    assert r.status_code == 500
+    assert "blob PUT 403" in r.json()["detail"]

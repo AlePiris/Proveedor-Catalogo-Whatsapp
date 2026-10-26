@@ -114,7 +114,10 @@ async def subir_logo(
         raise HTTPException(status_code=400, detail="La imagen supera los 5 MB")
 
     fila = _obtener_fila(db)
-    url = guardar_archivo(_armar_nombre_logo(archivo), datos, archivo.content_type)
+    try:
+        url = guardar_archivo(_armar_nombre_logo(archivo), datos, archivo.content_type)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar el logo: {e!r}")
     borrar_archivo(fila.logo_url)
     fila.logo_url = url
     db.commit()

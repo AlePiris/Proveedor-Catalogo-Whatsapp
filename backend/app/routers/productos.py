@@ -293,8 +293,13 @@ async def subir_imagen(
     nombre = f"{producto_id}_{uuid.uuid4().hex}{ext}"
 
     # El helper ÚNICO decide dónde vive el archivo (disco en dev, Blob en prod):
-    # la URL que guarda en la fila es la que devuelve.
-    url = storage.guardar_archivo(nombre, datos, archivo.content_type)
+    # la URL que guarda en la fila es la que devuelve. Si el guardado falla,
+    # el 500 LLEVA la causa (el panel la muestra: un storage mal configurado
+    # se diagnostica sin tocar logs del server).
+    try:
+        url = storage.guardar_archivo(nombre, datos, archivo.content_type)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar la imagen: {e!r}")
 
     # APPEND a la galería. "Sin filas NI imagen_url" (no solo "sin filas"):
     # si el dueño seteó imagen_url a mano por PUT y recién ahora sube una foto,
