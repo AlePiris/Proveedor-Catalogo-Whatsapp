@@ -38,3 +38,8 @@ Thumbs.db
 # Las imágenes que sube el dueño se guardan acá en dev. En prod van a Vercel Blob.
 # El backend crea la carpeta solo; no se versionan los archivos que suba el usuario.
 backend/uploads/
+
+# ===== Archivos internos, no publicos =====
+# Salida de herramientas de analisis local (graphify) y notas internas del proyecto.
+graphify-out/
+ESTADO-PROYECTO.md
