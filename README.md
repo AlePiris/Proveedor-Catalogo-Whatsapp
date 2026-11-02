@@ -1,6 +1,6 @@
 # Proveedor Web — Trabajo Integrador (Frontend + Backend)
 
-Web para una pizzería que **no cobra online**: el cliente arma el carrito, se
+Web para un proveedor que **no cobra online**: el cliente arma el carrito, se
 envía un pedido por **WhatsApp** y **se guarda en la base de datos** como
 `pendiente`. El dueño, desde un dashboard, **edita y confirma** el pedido (porque
 por WhatsApp pueden sumarse o quitarse cosas). Solo los pedidos **confirmados**
